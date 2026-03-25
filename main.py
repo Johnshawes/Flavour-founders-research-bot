@@ -69,30 +69,65 @@ async def scrape_instagram_creators() -> str:
         log.warning("No APIFY_API_TOKEN set — skipping Instagram scrape")
         return "No Instagram data available (Apify not configured)."
 
+    import asyncio
     log.info(f"Apify token present: {bool(APIFY_API_TOKEN)} (length: {len(APIFY_API_TOKEN)})")
     all_posts = []
 
-    # Scrape all creators in a single Apify run (cheaper + faster)
     try:
         log.info(f"Scraping {len(CREATOR_HANDLES)} Instagram creators via Apify...")
-        async with httpx.AsyncClient(timeout=300) as http:
-            run_resp = await http.post(
-                "https://api.apify.com/v2/acts/apify~instagram-profile-scraper/run-sync-get-dataset-items",
+        async with httpx.AsyncClient(timeout=600) as http:
+
+            # Step 1: Start the run
+            start_resp = await http.post(
+                "https://api.apify.com/v2/acts/apify~instagram-profile-scraper/runs",
                 params={"token": APIFY_API_TOKEN},
                 json={
                     "usernames": CREATOR_HANDLES,
                     "resultsLimit": 5,
                 },
-                timeout=300,
             )
+            log.info(f"Apify start response: {start_resp.status_code}")
 
-            log.info(f"Apify response status: {run_resp.status_code}")
+            if start_resp.status_code not in (200, 201):
+                log.error(f"Apify start failed: {start_resp.status_code} - {start_resp.text[:500]}")
+                return f"Instagram scrape failed to start (HTTP {start_resp.status_code})."
 
-            if run_resp.status_code != 200:
-                log.error(f"Apify error: {run_resp.status_code} - {run_resp.text[:500]}")
-                return f"Instagram scrape failed (HTTP {run_resp.status_code})."
+            run_data = start_resp.json().get("data", {})
+            run_id = run_data.get("id")
+            dataset_id = run_data.get("defaultDatasetId")
+            log.info(f"Apify run started: run_id={run_id}, dataset_id={dataset_id}")
 
-            data = run_resp.json()
+            if not run_id:
+                return "Instagram scrape failed: no run ID returned."
+
+            # Step 2: Poll until the run finishes (max 5 minutes)
+            for attempt in range(30):
+                await asyncio.sleep(10)
+                status_resp = await http.get(
+                    f"https://api.apify.com/v2/actor-runs/{run_id}",
+                    params={"token": APIFY_API_TOKEN},
+                )
+                run_status = status_resp.json().get("data", {}).get("status")
+                log.info(f"Apify run status (attempt {attempt+1}): {run_status}")
+
+                if run_status == "SUCCEEDED":
+                    break
+                elif run_status in ("FAILED", "ABORTED", "TIMED-OUT"):
+                    return f"Instagram scrape failed: run status {run_status}."
+            else:
+                return "Instagram scrape timed out waiting for Apify."
+
+            # Step 3: Fetch the dataset
+            dataset_resp = await http.get(
+                f"https://api.apify.com/v2/datasets/{dataset_id}/items",
+                params={"token": APIFY_API_TOKEN},
+            )
+            log.info(f"Apify dataset response: {dataset_resp.status_code}")
+
+            if dataset_resp.status_code != 200:
+                return f"Instagram scrape failed to fetch results (HTTP {dataset_resp.status_code})."
+
+            data = dataset_resp.json()
             log.info(f"Apify returned {len(data)} profiles")
 
             if not data:
