@@ -32,6 +32,9 @@ MANUAL_TRIGGER_TOKEN = os.environ.get("MANUAL_TRIGGER_TOKEN", "")  # optional au
 APIFY_API_TOKEN = os.environ.get("APIFY_API_TOKEN", "")  # for Instagram scraping
 RESEARCH_WEBHOOK_URL = os.environ.get("RESEARCH_WEBHOOK_URL", "")  # content bot ingest
 
+# ── Your handle (for daily reel review) ───────────────────────────────────
+OWN_HANDLE = "john_s_hawes"
+
 # ── Creator handles to scrape ─────────────────────────────────────────────
 CREATOR_HANDLES = [
     "thomas_straker",
@@ -169,6 +172,36 @@ def _format_profile_data(profile_data: list) -> str:
     return "REAL INSTAGRAM DATA FROM WATCHED CREATORS:\n" + "\n".join(sections)
 
 
+# ── Format own reels (daily review) ───────────────────────────────────────
+def _format_own_reels(post_data: list) -> str:
+    """Format John's own recent reels with full engagement data for daily review."""
+    if not post_data:
+        return "YOUR RECENT REELS:\n  No reel data available."
+
+    # Sort by engagement
+    for p in post_data:
+        p["_engagement"] = (p.get("likesCount", 0) or 0) + (p.get("commentsCount", 0) or 0)
+    post_data.sort(key=lambda p: p["_engagement"], reverse=True)
+
+    result = "YOUR RECENT REELS (@john_s_hawes) — sorted by engagement:\n"
+    for p in post_data[:5]:
+        post_type = p.get("type", "unknown")
+        likes = p.get("likesCount", 0) or 0
+        comments = p.get("commentsCount", 0) or 0
+        views = p.get("videoPlayCount") or p.get("videoViewCount") or p.get("playCount") or 0
+        url = p.get("url") or ""
+        full_caption = (p.get("caption") or "").strip()
+        hook_line = full_caption.split("\n")[0][:100] if full_caption else ""
+
+        result += f"\n  [{post_type.upper()}] {likes:,} likes | {comments:,} comments | {views:,} views"
+        if url:
+            result += f"\n  URL: {url}"
+        result += f"\n  HOOK: \"{hook_line}\""
+        result += f"\n  FULL CAPTION: \"{full_caption[:500]}\"\n"
+
+    return result
+
+
 # ── Format deep post data (weekly) ───────────────────────────────────────
 def _format_deep_data(profile_data: list, post_data: list, discovery_data: list) -> str:
     """Rich format — profiles + detailed posts + discovered creators (weekly)."""
@@ -291,13 +324,19 @@ async def scrape_instagram_creators(digest_type: str = "daily") -> str:
     async with httpx.AsyncClient(timeout=600) as http:
         try:
             if digest_type == "daily":
-                # Daily: profile scraper only (cheap)
-                profile_data = await _run_apify_actor(
+                # Daily: profile scraper for creators + post scraper for own reels
+                profile_task = _run_apify_actor(
                     http, "apify~instagram-profile-scraper",
                     {"usernames": CREATOR_HANDLES, "resultsLimit": 5},
                     "DailyProfiles",
                 )
-                return _format_profile_data(profile_data)
+                own_posts_task = _run_apify_actor(
+                    http, "apify~instagram-post-scraper",
+                    {"username": [OWN_HANDLE], "resultsLimit": 5},
+                    "OwnReels",
+                )
+                profile_data, own_posts = await asyncio.gather(profile_task, own_posts_task)
+                return _format_profile_data(profile_data) + "\n\n" + _format_own_reels(own_posts)
 
             else:
                 # Weekly: profile + post + discovery scrapers in parallel
@@ -402,12 +441,22 @@ Based on the real Instagram data above, analyse what the watched creators are do
 
 🎬 Steal this — [One specific thing a creator did this week that worked really well. What was it, why did it work, and how could Flavour Founders adapt it?]
 
+📹 YOUR REEL REVIEW
+The data above includes YOUR recent reels (@john_s_hawes). Analyse them:
+
+🏆 Winner — [Which of your recent reels performed best? State the hook, views, likes, comments. Why did this one outperform?]
+
+📉 Underperformer — [Which reel got the least engagement? What was the hook? Why do you think it underperformed compared to the winner?]
+
+💡 One thing to change — [Based on the data, one specific actionable change for tomorrow's reels. Be direct — e.g. "Your top reel used a contradiction hook, your worst used a statement. Lead with contradiction tomorrow."]
+
 ---
 
 RULES:
 - This is RESEARCH ONLY. Do NOT generate reel ideas, hooks, or content briefs.
 - Creator intelligence must reference ACTUAL posts from the Instagram data — not guesses.
-- Keep the whole digest under 250 words.
+- Reel review must reference YOUR actual reel data — not generic advice.
+- Keep the whole digest under 350 words.
 - No motivational fluff. Facts, data, insight only.
 - NEVER cite news older than 48 hours. If nothing recent exists, say so."""
 
