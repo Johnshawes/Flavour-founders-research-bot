@@ -214,33 +214,37 @@ def _format_deep_data(profile_data: list, post_data: list, discovery_data: list)
 
     result = "REAL INSTAGRAM DATA FROM WATCHED CREATORS (DETAILED):\n" + "\n".join(sections)
 
-    # ── Discovery section ────────────────────────────────────────────────
+    # ── Discovery section (from hashtag post scraper results) ──────────
     if discovery_data:
-        # Filter by follower range and exclude existing watchlist
         existing = set(CREATOR_HANDLES)
-        discovered = []
-        for profile in discovery_data:
-            username = profile.get("username") or profile.get("ownerUsername") or "unknown"
+        # Group discovered posts by creator, pick best post per creator
+        creators_seen = {}
+        for post in discovery_data:
+            username = post.get("ownerUsername") or post.get("owner", {}).get("username") or "unknown"
             if username in existing:
                 continue
-            followers = profile.get("followersCount") or profile.get("likesCount") or 0
-            if not (DISCOVERY_MIN_FOLLOWERS <= followers <= DISCOVERY_MAX_FOLLOWERS):
-                continue
-            discovered.append(profile)
-            existing.add(username)  # deduplicate
+            engagement = (post.get("likesCount", 0) or 0) + (post.get("commentsCount", 0) or 0)
+            if username not in creators_seen or engagement > creators_seen[username]["_engagement"]:
+                creators_seen[username] = {**post, "_engagement": engagement}
 
-        if discovered:
-            result += "\n\n🔎 DISCOVERED CREATORS (new accounts from hashtag search, 10K-500K followers):\n"
-            for profile in discovered[:5]:
-                username = profile.get("username") or profile.get("ownerUsername") or "unknown"
-                followers = profile.get("followersCount", "?")
-                bio = (profile.get("biography") or "")[:150]
-                caption = (profile.get("caption") or "")[:150]
-                result += f"\n  @{username} ({followers:,} followers)"
-                if bio:
-                    result += f" — {bio}"
-                elif caption:
-                    result += f" — Recent: \"{caption}\""
+        # Sort discovered creators by engagement
+        sorted_creators = sorted(creators_seen.values(), key=lambda p: p["_engagement"], reverse=True)
+
+        if sorted_creators:
+            result += "\n\n🔎 DISCOVERED CREATORS (from hashtag search, sorted by engagement):\n"
+            for post in sorted_creators[:5]:
+                username = post.get("ownerUsername") or post.get("owner", {}).get("username") or "unknown"
+                likes = post.get("likesCount", 0) or 0
+                comments = post.get("commentsCount", 0) or 0
+                views = post.get("videoPlayCount") or post.get("videoViewCount") or 0
+                full_caption = (post.get("caption") or "").strip()
+                hook_line = full_caption.split("\n")[0][:100] if full_caption else ""
+                post_type = post.get("type", "unknown")
+
+                result += f"\n  @{username}"
+                result += f"\n  [{post_type.upper()}] {likes:,} likes | {comments:,} comments | {views:,} views"
+                result += f"\n  HOOK: \"{hook_line}\""
+                result += f"\n  CAPTION: \"{full_caption[:300]}\"\n"
 
     return result
 
@@ -269,7 +273,6 @@ async def scrape_instagram_creators(digest_type: str = "daily") -> str:
             else:
                 # Weekly: profile + post + discovery scrapers in parallel
                 creator_urls = [f"https://www.instagram.com/{h}/" for h in CREATOR_HANDLES]
-                hashtag_urls = [f"https://www.instagram.com/explore/tags/{tag}/" for tag in DISCOVERY_HASHTAGS]
 
                 profile_task = _run_apify_actor(
                     http, "apify~instagram-profile-scraper",
@@ -281,9 +284,11 @@ async def scrape_instagram_creators(digest_type: str = "daily") -> str:
                     {"directUrls": creator_urls, "resultsLimit": 5, "resultsType": "posts"},
                     "WeeklyPosts",
                 )
+                # Discovery: use the same post scraper with hashtag explore URLs
+                hashtag_urls = [f"https://www.instagram.com/explore/tags/{tag}/" for tag in DISCOVERY_HASHTAGS]
                 discovery_task = _run_apify_actor(
-                    http, "apify~instagram-hashtag-scraper",
-                    {"hashtags": DISCOVERY_HASHTAGS, "resultsLimit": 10},
+                    http, "apify~instagram-post-scraper",
+                    {"directUrls": hashtag_urls, "resultsLimit": 10, "resultsType": "posts"},
                     "Discovery",
                 )
 
