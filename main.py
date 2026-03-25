@@ -170,7 +170,10 @@ PERSONAL BRAND PILLARS:
 1. Food & Drink Business (PRIMARY) — bakery/café growth, profit, margins, labour, systems, scaling
 2. Care Less (SECONDARY) — life perspective, freedom, time, YOLO, not overvaluing seriousness
 
+TARGET AUDIENCE: Bakery, cafe, coffee shop, and restaurant owners/founders. People running or starting their own food business.
+
 YOUR JOB: Research and intelligence ONLY. Do NOT generate reel ideas, hooks, or content briefs — a separate content bot handles that.
+Focus on ENTREPRENEURSHIP in food & drink — not macro industry reports, alt-protein regulation, or manufacturing stats. Everything must be relevant to someone running a small-to-medium food business.
 """
 
 
@@ -196,7 +199,7 @@ Output EXACTLY in this format — nothing else:
 ⚡ DAILY RESEARCH DIGEST — {datetime.now().strftime("%d %b %Y")}
 
 📰 ONE THING HAPPENING TODAY
-[Single most relevant UK food/hospitality news item or trend. One sentence on what happened. One sentence on why it matters to a food business owner.]
+[Single most relevant thing for someone running a bakery, cafe, coffee shop, or restaurant. NOT macro industry news — find real stories about food entrepreneurs, small operators, or trends that directly affect someone running their own food business. One sentence on what happened. One sentence on why it matters.]
 
 🔍 CREATOR INTELLIGENCE
 Based on the real Instagram data above, analyse what the watched creators are doing:
@@ -239,8 +242,12 @@ Output EXACTLY in this format — nothing else:
 ---
 📋 WEEKLY RESEARCH DIGEST — w/c {week_start}
 
-📰 3 THINGS SHAPING UK FOOD BUSINESS THIS WEEK
-- [Insight 1 — what happened + why it matters to a food entrepreneur]
+📰 3 THINGS RELEVANT TO BAKERY/CAFE/RESTAURANT OWNERS THIS WEEK
+Focus on entrepreneurship in food & drink — NOT macro industry news. Look for:
+- Real stories of bakery/cafe/coffee shop/restaurant owners (openings, closings, scaling, struggles, wins)
+- Trends affecting small food business operators (labour, costs, margins, footfall, delivery, social media)
+- Anything a bakery owner scrolling Instagram would think "that's me"
+- [Insight 1 — what happened + why it matters to someone running a bakery/cafe/restaurant]
 - [Insight 2]
 - [Insight 3]
 
