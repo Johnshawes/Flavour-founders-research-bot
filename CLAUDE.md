@@ -78,6 +78,7 @@ These are NOT competitors — they're people whose personal brand style, energy,
 - **Daniel Priestley** (@danielpriestley) — business education, authority, thought leadership
 - **Daniel Dalen** (@danieldalen) — food content, personality-led, authentic
 - **Iman Gadzhi** (@imangadzhi) — high-ticket education, bold personal brand
+- **MrFourToEight** (@mrfourtoeight) — TOP inspiration. Content style, storytelling, values, messaging, faith to wealth journey — all aligned with where Flavour Founders is heading
 
 ---
 
