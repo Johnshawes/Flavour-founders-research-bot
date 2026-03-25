@@ -564,22 +564,34 @@ async def debug_scrape(token: str = "", mode: str = "daily"):
 
 
 @app.get("/debug/discovery")
-async def debug_discovery(token: str = ""):
-    """Test discovery scraper and return raw data structure."""
+async def debug_discovery(token: str = "", variant: int = 1):
+    """Test discovery scraper with different input formats. variant=1,2,3"""
     import asyncio
     if MANUAL_TRIGGER_TOKEN and token != MANUAL_TRIGGER_TOKEN:
         return {"error": "Unauthorised"}
+
+    variants = {
+        1: {"search": DISCOVERY_HASHTAGS, "resultsLimit": 5, "searchType": "hashtag"},
+        2: {"search": "bakerybusiness", "resultsLimit": 5, "searchType": "hashtag"},
+        3: {"queries": ["bakerybusiness", "bakeryowner"], "resultsLimit": 5, "searchType": "hashtag"},
+        4: {"search": ["bakerybusiness"], "resultsLimit": 5, "type": "hashtag"},
+        5: {"hashtags": ["bakerybusiness"], "resultsLimit": 5},
+    }
+    input_json = variants.get(variant, variants[1])
+
     async with httpx.AsyncClient(timeout=600) as http:
         data = await _run_apify_actor(
             http, "apify~instagram-search-scraper",
-            {"search": DISCOVERY_HASHTAGS, "resultsLimit": 5, "searchType": "hashtag"},
-            "DebugDiscovery",
+            input_json,
+            f"DebugDiscovery_v{variant}",
         )
     if not data:
-        return {"status": "no data", "items": 0}
+        return {"status": "no data", "items": 0, "variant": variant, "input": input_json}
     first = data[0]
     return {
         "items": len(data),
+        "variant": variant,
+        "input": input_json,
         "first_item_keys": list(first.keys()),
         "first_item_sample": {k: str(v)[:200] for k, v in list(first.items())[:15]},
     }
