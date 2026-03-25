@@ -272,23 +272,21 @@ async def scrape_instagram_creators(digest_type: str = "daily") -> str:
 
             else:
                 # Weekly: profile + post + discovery scrapers in parallel
-                creator_urls = [f"https://www.instagram.com/{h}/" for h in CREATOR_HANDLES]
-
                 profile_task = _run_apify_actor(
                     http, "apify~instagram-profile-scraper",
                     {"usernames": CREATOR_HANDLES, "resultsLimit": 10},
                     "WeeklyProfiles",
                 )
+                # Post scraper takes usernames, not URLs
                 post_task = _run_apify_actor(
                     http, "apify~instagram-post-scraper",
-                    {"directUrls": creator_urls, "resultsLimit": 5, "resultsType": "posts"},
+                    {"username": CREATOR_HANDLES, "resultsLimit": 5},
                     "WeeklyPosts",
                 )
-                # Discovery: use the same post scraper with hashtag explore URLs
-                hashtag_urls = [f"https://www.instagram.com/explore/tags/{tag}/" for tag in DISCOVERY_HASHTAGS]
+                # Discovery: use the main instagram-scraper with hashtag search
                 discovery_task = _run_apify_actor(
-                    http, "apify~instagram-post-scraper",
-                    {"directUrls": hashtag_urls, "resultsLimit": 10, "resultsType": "posts"},
+                    http, "apify~instagram-scraper",
+                    {"search": " ".join(DISCOVERY_HASHTAGS), "searchType": "hashtag", "resultsLimit": 10},
                     "Discovery",
                 )
 
