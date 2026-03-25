@@ -695,6 +695,40 @@ async def debug_discovery(token: str = ""):
     }
 
 
+@app.get("/debug/own-reels")
+async def debug_own_reels(token: str = ""):
+    """Debug: show raw post data for own handle."""
+    import asyncio
+    if MANUAL_TRIGGER_TOKEN and token != MANUAL_TRIGGER_TOKEN:
+        return {"error": "Unauthorised"}
+    async with httpx.AsyncClient(timeout=600) as http:
+        data = await _run_apify_actor(
+            http, "apify~instagram-post-scraper",
+            {"username": [OWN_HANDLE], "resultsLimit": 5},
+            "DebugOwnReels",
+        )
+    if not data:
+        return {"status": "no data", "items": 0}
+    return {
+        "items": len(data),
+        "posts": [
+            {
+                "type": p.get("type"),
+                "timestamp": p.get("timestamp"),
+                "takenAtTimestamp": p.get("takenAtTimestamp"),
+                "isPinned": p.get("isPinned"),
+                "pinned": p.get("pinned"),
+                "likesCount": p.get("likesCount"),
+                "commentsCount": p.get("commentsCount"),
+                "videoPlayCount": p.get("videoPlayCount"),
+                "caption": (p.get("caption") or "")[:100],
+                "all_keys": list(p.keys()),
+            }
+            for p in data[:5]
+        ],
+    }
+
+
 @app.post("/trigger/{digest_type}")
 async def manual_trigger(digest_type: str, background_tasks: BackgroundTasks, token: str = ""):
     """Manually trigger a digest. digest_type = 'daily' or 'weekly'."""
