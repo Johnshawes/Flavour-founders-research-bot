@@ -202,6 +202,12 @@ Brand config:
 
 Today is {today}.
 
+CRITICAL — RECENCY RULES:
+- You MUST use web search before writing anything. Do NOT rely on your training data for news.
+- Only cite news, stories, or events from the LAST 48 HOURS. Nothing older.
+- If your web search returns nothing from the last 48 hours, say "No relevant news found today" — do NOT fall back to older stories.
+- Include the source and date for every news item cited.
+
 Run a DAILY RESEARCH digest. Use web search for news. Use the REAL INSTAGRAM DATA above for creator intelligence.
 
 Output EXACTLY in this format — nothing else:
@@ -210,7 +216,7 @@ Output EXACTLY in this format — nothing else:
 ⚡ DAILY RESEARCH DIGEST — {datetime.now().strftime("%d %b %Y")}
 
 📰 ONE THING HAPPENING TODAY
-[One entrepreneurship lesson from today's news relevant to bakery/café/coffee shop/restaurant owners. Focus exclusively on scaling, profit, margins, or systems. No macro industry news, trade events, or wage statistics. One sentence on the lesson. One sentence on why it matters to food entrepreneurs.]
+[One entrepreneurship lesson from today's news (last 48 hours ONLY) relevant to bakery/café/coffee shop/restaurant owners. Focus exclusively on scaling, profit, margins, or systems. No macro industry news, trade events, or wage statistics. One sentence on the lesson. One sentence on why it matters to food entrepreneurs. Include source and date.]
 
 🔍 CREATOR INTELLIGENCE
 Based on the real Instagram data above, analyse what the watched creators are doing:
@@ -229,7 +235,8 @@ RULES:
 - This is RESEARCH ONLY. Do NOT generate reel ideas, hooks, or content briefs.
 - Creator intelligence must reference ACTUAL posts from the Instagram data — not guesses.
 - Keep the whole digest under 250 words.
-- No motivational fluff. Facts, data, insight only."""
+- No motivational fluff. Facts, data, insight only.
+- NEVER cite news older than 48 hours. If nothing recent exists, say so."""
 
 
 def build_weekly_prompt(config: dict, instagram_data: str = "") -> str:
@@ -246,6 +253,12 @@ Brand config:
 
 Week of {week_start}.
 
+CRITICAL — RECENCY RULES:
+- You MUST use web search extensively before writing anything. Do NOT rely on your training data for news.
+- Only cite news, stories, or events from the LAST 7 DAYS. Nothing older.
+- If your web search returns nothing from the last 7 days for a section, say "No relevant news found this week" — do NOT fall back to older stories.
+- Include the source and date for every news item cited.
+
 Run a WEEKLY DEEP-DIVE research report. Use web search extensively for market intel. Use the REAL INSTAGRAM DATA above for creator analysis.
 
 Output EXACTLY in this format — nothing else:
@@ -253,14 +266,14 @@ Output EXACTLY in this format — nothing else:
 ---
 📋 WEEKLY RESEARCH DIGEST — w/c {week_start}
 
-📰 3 THINGS RELEVANT TO BAKERY/CAFE/RESTAURANT OWNERS THIS WEEK
+📰 3 THINGS RELEVANT TO BAKERY/CAFE/RESTAURANT OWNERS THIS WEEK (last 7 days ONLY)
 Focus on entrepreneurship in food & drink — NOT macro industry news. Look for:
 - Real stories of bakery/cafe/coffee shop/restaurant owners (openings, closings, scaling, struggles, wins)
 - Trends affecting small food business operators (labour, costs, margins, footfall, delivery, social media)
 - Anything a bakery owner scrolling Instagram would think "that's me"
-- [Insight 1 — what happened + why it matters to someone running a bakery/cafe/restaurant]
-- [Insight 2]
-- [Insight 3]
+- [Insight 1 — what happened + why it matters to someone running a bakery/cafe/restaurant. Source + date.]
+- [Insight 2. Source + date.]
+- [Insight 3. Source + date.]
 
 🔍 CREATOR INTELLIGENCE (WEEKLY DEEP DIVE)
 Based on the real Instagram data above:
@@ -282,6 +295,7 @@ RULES:
 - This is RESEARCH ONLY. Do NOT generate reel ideas, hooks, captions, or content briefs.
 - Creator intelligence must reference ACTUAL posts from the Instagram data — not guesses.
 - Every insight must be backed by data or specific observations.
+- NEVER cite news older than 7 days. If nothing recent exists, say so.
 - Max 400 words total."""
 
 
