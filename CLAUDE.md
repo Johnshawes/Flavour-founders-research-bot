@@ -7,29 +7,91 @@ No code changes needed — the bot reads this on every run.
 
 ## Brand Context
 
-Flavour Founders is a UK-based food and hospitality personal brand.
-The brand sits at the intersection of food culture, hospitality industry insight,
-and personal branding for food entrepreneurs and creators.
+John Hawes — school dropout turned multi 8-figure food business owner.
+Runs Watermoor Meat Supply (6 retail sites, production kitchen, wholesale — £10M+ group).
+Currently scaling KNEAD (bakery/hospitality brand) and launching LARDON (restaurant).
+
+Personal brand sits at the intersection of food entrepreneurship and the "Care Less" philosophy.
+Not a coach. Not a motivational speaker. A real operator sharing real lessons.
+
+**Content Pillars:**
+1. Food & Drink Business (PRIMARY) — bakery/cafe growth, profit, margins, labour, systems, scaling
+2. Care Less (SECONDARY) — life perspective, freedom, time, YOLO, not overvaluing seriousness
+
+**Content Schedule:**
+- Mon / Wed / Sat / Sun → Food & Drink Business
+- Tue / Thu / Fri → Care Less
+
+**Brand Voice:**
+- Direct, honest, slightly confrontational, insight-led
+- NO fluff, NO generic motivation, NO basic advice
+- Always ask: "Would a bakery owner feel called out?" If not — it's not good enough.
 
 ---
 
-## Target Audience
+## Your Truth (What Makes You Different)
 
-- Food entrepreneurs and independent restaurant/hospitality owners (UK)
-- Food content creators and influencers looking to build a personal brand
-- Hospitality professionals wanting to grow their profile
-- Age range: 25–45
+- School dropout — didn't fit the system, led to lack of self-belief, isolation, trust issues
+- Highly creative, ADD — learned to build teams that cover weaknesses
+- Built everything from scratch — no investors, no handouts
+- Care Less philosophy: most things aren't that important, stop beating yourself up
+- Passion for empowering future founders to chase their dreams without burning out
+- "Subtle art of not giving a F***" energy — remove ego, get the right people on the bus
+
+---
+
+## Target Audience (Avatar)
+
+**Demographic:**
+- Male, 20-25 years old
+- UK-based (primarily)
+- Ambitious, food obsessed, go-getters
 - Platforms: Instagram, TikTok, LinkedIn
 
+**Psychographic:**
+- Aspiring or early-stage food/drink entrepreneurs
+- Want to turn culinary passion into profit
+- Feel overwhelmed, underpaid, or stuck
+- Drawn to real stories over polished corporate content
+- Want freedom AND a successful business — not one or the other
+
 ---
 
-## Competitors & Brands to Watch
+## Monetisation
 
-List accounts, brands, or publications to monitor each week.
+Single high-ticket offer:
+- **Flavour Founders 180-Day Bakery Transformation Programme — £5,000**
+- Takes bakery/cafe owners from unprofitable and owner-dependent to systemised, profitable, scalable
+- Target: 10-15% net profit margin
+- Phases: Onboarding → Profit Reset → Dream Team Builder → Automation & Freedom
 
-- [Add competitor Instagram handles here]
-- [Add competitor brand names here]
-- [Add industry publications/newsletters here e.g. The Caterer, BigHospitality]
+No low-ticket ladder. One offer. High intent only.
+
+---
+
+## Brands I Admire (Personal Brand Inspiration)
+
+These are NOT competitors — they're people whose personal brand style, energy, or approach I admire:
+
+- **Simon Squibb** (@simonsquibb) — entrepreneurship, giving back, raw honesty
+- **Grace Beverly** (@gracebeverley) — young founder, built multiple brands, transparent
+- **Daniel Priestley** (@danielpriestley) — business education, authority, thought leadership
+- **Daniel Dalen** (@danieldalen) — food content, personality-led, authentic
+- **Iman Gadzhi** (@imangadzhi) — high-ticket education, bold personal brand
+
+---
+
+## Creators I Aspire To Be Like (Food/Drink Space)
+
+These are the food creators whose content style, audience, or positioning I want to move towards:
+
+- **Thomas Straker** (@thomas_straker) — chef personality, lifestyle + food, massive engagement
+- **Rollboys LDN** (@rollboysldn) — food brand with personality, community-driven
+- **Sourdough Sophia** (@sourdoughsophia) — bakery niche, authentic, engaged following
+- **Cantoast LDN** (@cantoast.ldn) — food brand building in public
+- **JB Copeland** (@jb_copeland) — food creator, business angle
+
+Monitor what these creators are doing — content formats, hooks, engagement tactics, new launches.
 
 ---
 
@@ -43,19 +105,22 @@ Research should prioritise intelligence on these areas:
 - Personal branding for food professionals
 - Instagram & TikTok algorithm changes affecting food content
 - UK consumer food behaviour and sentiment
+- High-ticket education/coaching market trends
+- Bakery/cafe profitability and industry benchmarks
 
 ---
 
 ## Tone & Output Style
 
-- Professional but warm and direct
-- Actionable over theoretical — every insight should suggest a "so what"
+- Direct, no waffle — like John would say it
+- Actionable over theoretical — every insight needs a "so what"
 - UK-focused unless a global trend is highly relevant
-- Punchy bullet points preferred over long paragraphs
+- Punchy bullet points, not essays
+- Always filter through: "Would this help a bakery owner or aspiring food founder?"
 
 ---
 
 ## Schedule
 
-- Daily digest: 07:00 Europe/London — trending topics, quick competitor pulse, 1 content idea
-- Weekly digest: Monday 08:00 Europe/London — full market review, competitor analysis, 7-day content brief
+- Daily digest: 07:00 Europe/London — trending topics, quick creator pulse, reel ideas
+- Weekly digest: Monday 08:00 Europe/London — full market review, creator analysis, 7-day content brief
