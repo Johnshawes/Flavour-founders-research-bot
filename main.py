@@ -350,19 +350,13 @@ async def scrape_instagram_creators(digest_type: str = "daily") -> str:
     async with httpx.AsyncClient(timeout=600) as http:
         try:
             if digest_type == "daily":
-                # Daily: profile scraper for creators + post scraper for own reels
-                profile_task = _run_apify_actor(
+                # Daily: profile scraper only (reel review runs separately at 8pm)
+                profile_data = await _run_apify_actor(
                     http, "apify~instagram-profile-scraper",
                     {"usernames": CREATOR_HANDLES, "resultsLimit": 5},
                     "DailyProfiles",
                 )
-                own_posts_task = _run_apify_actor(
-                    http, "apify~instagram-post-scraper",
-                    {"username": [OWN_HANDLE], "resultsLimit": 15},
-                    "OwnReels",
-                )
-                profile_data, own_posts = await asyncio.gather(profile_task, own_posts_task)
-                return _format_profile_data(profile_data) + "\n\n" + _format_own_reels(own_posts)
+                return _format_profile_data(profile_data)
 
             else:
                 # Weekly: profile + post + discovery scrapers in parallel
@@ -467,22 +461,12 @@ Based on the real Instagram data above, analyse what the watched creators are do
 
 🎬 Steal this — [One specific thing a creator did this week that worked really well. What was it, why did it work, and how could Flavour Founders adapt it?]
 
-📹 YOUR REEL REVIEW
-The data above includes YOUR recent reels (@john_s_hawes). Analyse them:
-
-🏆 Winner — [Which of your recent reels performed best? State the hook, views, likes, comments. Why did this one outperform?]
-
-📉 Underperformer — [Which reel got the least engagement? What was the hook? Why do you think it underperformed compared to the winner?]
-
-💡 One thing to change — [Based on the data, one specific actionable change for tomorrow's reels. Be direct — e.g. "Your top reel used a contradiction hook, your worst used a statement. Lead with contradiction tomorrow."]
-
 ---
 
 RULES:
 - This is RESEARCH ONLY. Do NOT generate reel ideas, hooks, or content briefs.
 - Creator intelligence must reference ACTUAL posts from the Instagram data — not guesses.
-- Reel review must reference YOUR actual reel data — not generic advice.
-- Keep the whole digest under 350 words.
+- Keep the whole digest under 250 words.
 - No motivational fluff. Facts, data, insight only.
 - NEVER cite news older than 48 hours. If nothing recent exists, say so."""
 
@@ -614,6 +598,89 @@ async def deliver_digest(digest_type: str, content: str):
                 log.error(f"Content bot delivery failed: {e}")
 
 
+# ── Evening reel review ────────────────────────────────────────────────────
+REEL_REVIEW_PROMPT = """You are analysing Instagram reel performance for @john_s_hawes (Flavour Founders).
+
+Below is the REAL data from the last 3 days of reels posted to the main grid (pinned posts excluded).
+
+{reel_data}
+
+Analyse these reels and output EXACTLY in this format:
+
+---
+📹 EVENING REEL REVIEW — {date}
+
+🏆 WINNER
+[Which reel performed best? State the hook, views, likes, comments. Why did this one outperform the others? Be specific about what made the hook work.]
+
+📉 UNDERPERFORMER
+[Which reel got the least engagement? What was the hook? Why did it underperform compared to the winner? Be honest and direct.]
+
+💡 ONE THING TO CHANGE TOMORROW
+[Based on the data, one specific actionable change for tomorrow's reels. Be direct — e.g. "Your top reel used a contradiction hook, your worst used a statement. Lead with contradiction tomorrow."]
+
+📊 NUMBERS AT A GLANCE
+[Quick table: each reel's hook (first line), views, likes, comments — so you can see the comparison at a glance]
+
+---
+
+RULES:
+- Reference ACTUAL reel data only — not guesses.
+- Be brutally honest about what's not working.
+- Keep it under 200 words.
+- No motivational fluff. Data and insight only."""
+
+
+async def run_reel_review() -> str:
+    """Scrape own reels and generate evening review."""
+    if not APIFY_API_TOKEN:
+        return "No Apify token — skipping reel review."
+
+    import asyncio
+    async with httpx.AsyncClient(timeout=600) as http:
+        own_posts = await _run_apify_actor(
+            http, "apify~instagram-post-scraper",
+            {"username": [OWN_HANDLE], "resultsLimit": 15},
+            "EveningReels",
+        )
+
+    reel_data = _format_own_reels(own_posts)
+
+    if "No reels found" in reel_data:
+        return reel_data
+
+    prompt = REEL_REVIEW_PROMPT.format(
+        reel_data=reel_data,
+        date=datetime.now().strftime("%d %b %Y"),
+    )
+
+    log.info("Running evening reel review...")
+    response = client.messages.create(
+        model="claude-sonnet-4-20250514",
+        max_tokens=1500,
+        messages=[{"role": "user", "content": prompt}],
+    )
+
+    output_parts = [block.text for block in response.content if block.type == "text"]
+    result = "\n\n".join(output_parts) if output_parts else "No output generated."
+    log.info(f"Reel review complete ({len(result)} chars)")
+    return result
+
+
+async def deliver_reel_review(content: str):
+    """POST reel review to Slack."""
+    payload = {
+        "text": f"*Flavour Founders — Evening Reel Review*\n{content}",
+    }
+    async with httpx.AsyncClient(timeout=30) as http:
+        try:
+            resp = await http.post(OUTPUT_WEBHOOK_URL, json=payload)
+            resp.raise_for_status()
+            log.info(f"Reel review delivered to Slack → {resp.status_code}")
+        except Exception as e:
+            log.error(f"Reel review delivery failed: {e}")
+
+
 # ── Scheduled jobs ─────────────────────────────────────────────────────────
 async def daily_job():
     log.info("⏰ Daily digest triggered")
@@ -627,6 +694,12 @@ async def weekly_job():
     await deliver_digest("weekly", content)
 
 
+async def evening_reel_job():
+    log.info("⏰ Evening reel review triggered")
+    content = await run_reel_review()
+    await deliver_reel_review(content)
+
+
 # ── FastAPI app ────────────────────────────────────────────────────────────
 app = FastAPI(title="Flavour Founders Research Bot")
 scheduler = AsyncIOScheduler(timezone="Europe/London")
@@ -638,8 +711,10 @@ async def startup():
     scheduler.add_job(daily_job, CronTrigger(hour=7, minute=0))
     # Weekly deep dive — every Monday at 8:00am London time
     scheduler.add_job(weekly_job, CronTrigger(day_of_week="mon", hour=8, minute=0))
+    # Evening reel review — every day at 8:00pm London time
+    scheduler.add_job(evening_reel_job, CronTrigger(hour=20, minute=0))
     scheduler.start()
-    log.info("Scheduler started — daily 07:00, weekly Mon 08:00 (Europe/London)")
+    log.info("Scheduler started — daily 07:00, weekly Mon 08:00, reel review 20:00 (Europe/London)")
 
 
 @app.on_event("shutdown")
@@ -754,11 +829,15 @@ async def debug_trigger(digest_type: str, token: str = ""):
     """Foreground trigger — returns result or error directly."""
     if MANUAL_TRIGGER_TOKEN and token != MANUAL_TRIGGER_TOKEN:
         return {"error": "Unauthorised"}
-    if digest_type not in ("daily", "weekly"):
-        return {"error": "digest_type must be 'daily' or 'weekly'"}
+    if digest_type not in ("daily", "weekly", "reels"):
+        return {"error": "digest_type must be 'daily', 'weekly', or 'reels'"}
     try:
-        content = await run_research(digest_type)
-        await deliver_digest(digest_type, content)
+        if digest_type == "reels":
+            content = await run_reel_review()
+            await deliver_reel_review(content)
+        else:
+            content = await run_research(digest_type)
+            await deliver_digest(digest_type, content)
         return {"status": "success", "digest_type": digest_type, "content_length": len(content), "preview": content[:500]}
     except Exception as e:
         return {"status": "error", "error": f"{type(e).__name__}: {e}"}
