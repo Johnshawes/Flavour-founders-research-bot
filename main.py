@@ -216,6 +216,14 @@ def _format_deep_data(profile_data: list, post_data: list, discovery_data: list)
 
     # ── Discovery section (from hashtag post scraper results) ──────────
     if discovery_data:
+        # Log first item's keys to understand data structure
+        log.info(f"Discovery returned {len(discovery_data)} items")
+        if discovery_data:
+            first = discovery_data[0]
+            log.info(f"Discovery item keys: {list(first.keys())}")
+            log.info(f"Discovery item sample: ownerUsername={first.get('ownerUsername')}, "
+                     f"owner={first.get('owner')}, username={first.get('username')}, "
+                     f"likesCount={first.get('likesCount')}, caption={str(first.get('caption',''))[:80]}")
         existing = set(CREATOR_HANDLES)
         # Group discovered posts by creator, pick best post per creator
         creators_seen = {}
@@ -553,6 +561,28 @@ async def debug_scrape(token: str = "", mode: str = "daily"):
         return {"error": "Unauthorised"}
     result = await scrape_instagram_creators(mode)
     return {"apify_token_set": bool(APIFY_API_TOKEN), "mode": mode, "result_length": len(result), "preview": result[:2000]}
+
+
+@app.get("/debug/discovery")
+async def debug_discovery(token: str = ""):
+    """Test discovery scraper and return raw data structure."""
+    import asyncio
+    if MANUAL_TRIGGER_TOKEN and token != MANUAL_TRIGGER_TOKEN:
+        return {"error": "Unauthorised"}
+    async with httpx.AsyncClient(timeout=600) as http:
+        data = await _run_apify_actor(
+            http, "apify~instagram-scraper",
+            {"search": " ".join(DISCOVERY_HASHTAGS), "searchType": "hashtag", "resultsLimit": 5},
+            "DebugDiscovery",
+        )
+    if not data:
+        return {"status": "no data", "items": 0}
+    first = data[0]
+    return {
+        "items": len(data),
+        "first_item_keys": list(first.keys()),
+        "first_item_sample": {k: str(v)[:200] for k, v in list(first.items())[:15]},
+    }
 
 
 @app.post("/trigger/{digest_type}")
