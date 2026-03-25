@@ -29,6 +29,7 @@ ANTHROPIC_API_KEY = os.environ["ANTHROPIC_API_KEY"]
 OUTPUT_WEBHOOK_URL = os.environ["OUTPUT_WEBHOOK_URL"]   # Slack / Notion / email relay
 MANUAL_TRIGGER_TOKEN = os.environ.get("MANUAL_TRIGGER_TOKEN", "")  # optional auth
 APIFY_API_TOKEN = os.environ.get("APIFY_API_TOKEN", "")  # for Instagram scraping
+RESEARCH_WEBHOOK_URL = os.environ.get("RESEARCH_WEBHOOK_URL", "")  # content bot ingest
 
 # ── Creator handles to scrape ─────────────────────────────────────────────
 CREATOR_HANDLES = [
@@ -360,9 +361,18 @@ async def deliver_digest(digest_type: str, content: str):
         try:
             resp = await http.post(OUTPUT_WEBHOOK_URL, json=payload)
             resp.raise_for_status()
-            log.info(f"Digest delivered → {resp.status_code}")
+            log.info(f"Digest delivered to Slack → {resp.status_code}")
         except Exception as e:
-            log.error(f"Webhook delivery failed: {e}")
+            log.error(f"Slack webhook delivery failed: {e}")
+
+        # Forward to content bot
+        if RESEARCH_WEBHOOK_URL:
+            try:
+                resp2 = await http.post(RESEARCH_WEBHOOK_URL, json=payload)
+                resp2.raise_for_status()
+                log.info(f"Digest delivered to content bot → {resp2.status_code}")
+            except Exception as e:
+                log.error(f"Content bot delivery failed: {e}")
 
 
 # ── Scheduled jobs ─────────────────────────────────────────────────────────
