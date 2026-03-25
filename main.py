@@ -291,10 +291,10 @@ async def scrape_instagram_creators(digest_type: str = "daily") -> str:
                     {"username": CREATOR_HANDLES, "resultsLimit": 5},
                     "WeeklyPosts",
                 )
-                # Discovery: use the main instagram-scraper with hashtag search
+                # Discovery: search for creators via hashtag keywords
                 discovery_task = _run_apify_actor(
-                    http, "apify~instagram-scraper",
-                    {"search": " ".join(DISCOVERY_HASHTAGS), "searchType": "hashtag", "resultsLimit": 10},
+                    http, "apify~instagram-search-scraper",
+                    {"search": DISCOVERY_HASHTAGS, "resultsLimit": 10, "searchType": "hashtag"},
                     "Discovery",
                 )
 
@@ -571,8 +571,8 @@ async def debug_discovery(token: str = ""):
         return {"error": "Unauthorised"}
     async with httpx.AsyncClient(timeout=600) as http:
         data = await _run_apify_actor(
-            http, "apify~instagram-scraper",
-            {"search": " ".join(DISCOVERY_HASHTAGS), "searchType": "hashtag", "resultsLimit": 5},
+            http, "apify~instagram-search-scraper",
+            {"search": DISCOVERY_HASHTAGS, "resultsLimit": 5, "searchType": "hashtag"},
             "DebugDiscovery",
         )
     if not data:
