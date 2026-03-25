@@ -38,6 +38,7 @@ CREATOR_HANDLES = [
     "sourdoughsophia",
     "cantoast.ldn",
     "jb_copeland",
+    "mrfourtoeight",
 ]
 
 # ── Load CLAUDE.md config ──────────────────────────────────────────────────
