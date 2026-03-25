@@ -69,52 +69,53 @@ async def scrape_instagram_creators() -> str:
         log.warning("No APIFY_API_TOKEN set — skipping Instagram scrape")
         return "No Instagram data available (Apify not configured)."
 
+    log.info(f"Apify token present: {bool(APIFY_API_TOKEN)} (length: {len(APIFY_API_TOKEN)})")
     all_posts = []
 
-    async with httpx.AsyncClient(timeout=120) as http:
-        for handle in CREATOR_HANDLES:
-            try:
-                log.info(f"Scraping Instagram: @{handle}")
+    # Scrape all creators in a single Apify run (cheaper + faster)
+    try:
+        log.info(f"Scraping {len(CREATOR_HANDLES)} Instagram creators via Apify...")
+        async with httpx.AsyncClient(timeout=300) as http:
+            run_resp = await http.post(
+                "https://api.apify.com/v2/acts/apify~instagram-profile-scraper/run-sync-get-dataset-items",
+                params={"token": APIFY_API_TOKEN},
+                json={
+                    "usernames": CREATOR_HANDLES,
+                    "resultsLimit": 5,
+                },
+                timeout=300,
+            )
 
-                # Run the Instagram Profile Scraper actor synchronously
-                run_resp = await http.post(
-                    "https://api.apify.com/v2/acts/apify~instagram-profile-scraper/run-sync-get-dataset-items",
-                    params={"token": APIFY_API_TOKEN},
-                    json={
-                        "usernames": [handle],
-                        "resultsLimit": 5,
-                    },
-                    timeout=120,
-                )
+            log.info(f"Apify response status: {run_resp.status_code}")
 
-                if run_resp.status_code != 200:
-                    log.error(f"Apify error for @{handle}: {run_resp.status_code} - {run_resp.text[:200]}")
-                    continue
+            if run_resp.status_code != 200:
+                log.error(f"Apify error: {run_resp.status_code} - {run_resp.text[:500]}")
+                return f"Instagram scrape failed (HTTP {run_resp.status_code})."
 
-                data = run_resp.json()
-                if not data:
-                    log.info(f"No data returned for @{handle}")
-                    continue
+            data = run_resp.json()
+            log.info(f"Apify returned {len(data)} profiles")
 
-                # Extract profile and recent posts
-                for profile in data:
-                    username = profile.get("username", handle)
-                    followers = profile.get("followersCount", "?")
-                    posts = profile.get("latestPosts", [])
+            if not data:
+                return "Instagram scrape returned no data."
 
-                    creator_summary = f"\n@{username} ({followers} followers) — recent posts:"
-                    for post in posts[:5]:
-                        caption = (post.get("caption") or "")[:150]
-                        likes = post.get("likesCount", 0)
-                        comments = post.get("commentsCount", 0)
-                        post_type = post.get("type", "unknown")
-                        creator_summary += f"\n  - [{post_type}] {likes} likes, {comments} comments: \"{caption}\""
+            for profile in data:
+                username = profile.get("username", "unknown")
+                followers = profile.get("followersCount", "?")
+                posts = profile.get("latestPosts", [])
 
-                    all_posts.append(creator_summary)
+                creator_summary = f"\n@{username} ({followers} followers) — recent posts:"
+                for post in posts[:5]:
+                    caption = (post.get("caption") or "")[:150]
+                    likes = post.get("likesCount", 0)
+                    comments = post.get("commentsCount", 0)
+                    post_type = post.get("type", "unknown")
+                    creator_summary += f"\n  - [{post_type}] {likes} likes, {comments} comments: \"{caption}\""
 
-            except Exception as e:
-                log.error(f"Failed to scrape @{handle}: {type(e).__name__}: {e}")
-                continue
+                all_posts.append(creator_summary)
+
+    except Exception as e:
+        log.error(f"Apify scrape failed: {type(e).__name__}: {e}")
+        return f"Instagram scrape failed: {type(e).__name__}: {e}"
 
     if not all_posts:
         return "Instagram scrape returned no data."
@@ -369,6 +370,15 @@ async def health():
         for job in scheduler.get_jobs()
     ]
     return {"status": "running", "bot": "Flavour Founders Research Bot", "scheduled_jobs": jobs}
+
+
+@app.get("/debug/scrape")
+async def debug_scrape(token: str = ""):
+    """Test the Apify scraper independently."""
+    if MANUAL_TRIGGER_TOKEN and token != MANUAL_TRIGGER_TOKEN:
+        return {"error": "Unauthorised"}
+    result = await scrape_instagram_creators()
+    return {"apify_token_set": bool(APIFY_API_TOKEN), "result_length": len(result), "preview": result[:1000]}
 
 
 @app.post("/trigger/{digest_type}")
