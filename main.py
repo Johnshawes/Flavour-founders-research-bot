@@ -210,7 +210,7 @@ Output EXACTLY in this format — nothing else:
 ⚡ DAILY RESEARCH DIGEST — {datetime.now().strftime("%d %b %Y")}
 
 📰 ONE THING HAPPENING TODAY
-[Single most relevant thing for someone running a bakery, cafe, coffee shop, or restaurant. NOT macro industry news — find real stories about food entrepreneurs, small operators, or trends that directly affect someone running their own food business. One sentence on what happened. One sentence on why it matters.]
+[One entrepreneurship lesson from today's news relevant to bakery/café/coffee shop/restaurant owners. Focus exclusively on scaling, profit, margins, or systems. No macro industry news, trade events, or wage statistics. One sentence on the lesson. One sentence on why it matters to food entrepreneurs.]
 
 🔍 CREATOR INTELLIGENCE
 Based on the real Instagram data above, analyse what the watched creators are doing:
@@ -338,8 +338,8 @@ async def deliver_digest(digest_type: str, content: str):
         except Exception as e:
             log.error(f"Slack webhook delivery failed: {e}")
 
-        # Forward to content bot
-        if RESEARCH_WEBHOOK_URL:
+        # Forward to content bot (daily only — weekly is Slack-only)
+        if RESEARCH_WEBHOOK_URL and digest_type == "daily":
             try:
                 resp2 = await http.post(RESEARCH_WEBHOOK_URL, json=payload)
                 resp2.raise_for_status()
