@@ -48,23 +48,23 @@ CREATOR_HANDLES = [
 # Add or remove names as you like — no code changes needed elsewhere.
 DISCOVERY_POOL = [
     # Bakery / bread creators
-    "breadaheadbakery",
-    "dustybakes",
-    "theboywhobakes",
-    "fabsbakeryfoundation",
-    "breadbybike",
-    # Cafe / coffee creators
-    "departmentofcoffee",
-    "watchhousecoffee",
-    "kaffeinelondon",
-    "curators_coffee",
-    "olocobaltics",
-    # Food business / hospitality entrepreneurs
-    "loopyloaf",
-    "thebreadstation",
-    "gordonramsay",
-    "maxhalley",
-    "chefyotam",
+    "breadaheadbakery",       # ~424K — London sourdough & education
+    "lilsbakerybrighton",     # Brighton bakery brand
+    "breadbybike",            # ~12K — indie bakery
+    "dustyknucklebakery",     # popular bakery brand
+    "jolenerestaurant",       # bakery-restaurant hybrid
+    # Cafe / coffee / hospitality
+    "departmentofcoffee",     # coffee culture
+    "watchhousecoffee",       # London specialty coffee
+    "dishamorita",            # hospitality entrepreneur
+    "maxhalley",              # sandwich king, food creator
+    "ravneetgill",            # baker & food writer
+    # Food business entrepreneurs
+    "miguelbarclaysart",      # budget food creator
+    "fitwaffle",              # baking creator
+    "clembalfour",            # food business
+    "thefoodboss_",           # food entrepreneur content
+    "ellafreedman_",          # bakery / food business
 ]
 DISCOVERY_MIN_FOLLOWERS = 10_000
 DISCOVERY_MAX_FOLLOWERS = 500_000
