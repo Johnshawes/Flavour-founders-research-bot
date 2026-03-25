@@ -162,7 +162,7 @@ async def scrape_instagram_creators() -> str:
 
 # ── Research prompts ───────────────────────────────────────────────────────
 BRAND_CONTEXT = """
-WHO YOU ARE WRITING FOR:
+WHO YOU ARE RESEARCHING FOR:
 A UK food entrepreneur who has built TWO 7-figure food businesses (bakery/café, multi-site).
 Currently scaling a group with a restaurant launching. Real experience, hard lessons, no theory.
 
@@ -170,145 +170,100 @@ PERSONAL BRAND PILLARS:
 1. Food & Drink Business (PRIMARY) — bakery/café growth, profit, margins, labour, systems, scaling
 2. Care Less (SECONDARY) — life perspective, freedom, time, YOLO, not overvaluing seriousness
 
-BRAND VOICE:
-- Direct, honest, slightly confrontational, insight-led
-- NO fluff, NO generic motivation, NO basic advice, NO surface-level content
-- Always ask: "Would this make a bakery owner feel called out?" If not — it's not good enough.
-
-REEL FORMAT (6–9 seconds, text-led, no talking):
-- Hook style: "Why [positive]... but [negative reality]" — contradiction hooks perform best
-- Best topics: profit, cash, margins, systems, time/freedom
-- Structure: Hook → Curiosity line → 1–2 punchy insight lines
-
-CONTENT ROTATION:
-💰 Money (profit, margins, cash)
-🧠 Control (systems, chaos, structure)
-⏱ Time (freedom, burnout, stepping away)
-🌍 Care Less (occasional — life perspective)
+YOUR JOB: Research and intelligence ONLY. Do NOT generate reel ideas, hooks, or content briefs — a separate content bot handles that.
 """
 
 
 def build_daily_prompt(config: dict, instagram_data: str = "") -> str:
     competitors = config.get("_raw", "")
     today = datetime.now().strftime("%A %d %B %Y")
-    return f"""You are a high-level content strategist and research assistant for a UK food entrepreneur personal brand called Flavour Founders.
+    return f"""You are a research intelligence assistant for a UK food entrepreneur personal brand called Flavour Founders.
 
 {BRAND_CONTEXT}
 
-Competitor/watch list from config:
+Brand config:
 {competitors}
 
 {instagram_data}
 
 Today is {today}.
 
-Run a DAILY INSPIRATION digest. Use web search to find what's happening TODAY that's relevant.
+Run a DAILY RESEARCH digest. Use web search for news. Use the REAL INSTAGRAM DATA above for creator intelligence.
 
-Output EXACTLY in this format — clean, no waffle:
+Output EXACTLY in this format — nothing else:
 
 ---
-⚡ DAILY DIGEST — {datetime.now().strftime("%d %b %Y")}
+⚡ DAILY RESEARCH DIGEST — {datetime.now().strftime("%d %b %Y")}
 
 📰 ONE THING HAPPENING TODAY
-[Single most relevant news item/trend for a UK food business owner. One sentence. Why it matters to them.]
+[Single most relevant UK food/hospitality news item or trend. One sentence on what happened. One sentence on why it matters to a food business owner.]
 
-🎬 3 REEL IDEAS FOR TODAY
+🔍 CREATOR INTELLIGENCE
+Based on the real Instagram data above, analyse what the watched creators are doing:
 
-IDEA 1 — [💰/🧠/⏱/🌍] [ANGLE NAME]
-Hook: "Why [positive]... but [negative reality]"
-Angle: [What the reel reveals — one sharp sentence]
-Why it works: [Why a bakery owner will feel called out]
+📊 What's hitting — [Which posts got the highest engagement? What topics/formats performed best? Include actual numbers.]
 
-IDEA 2 — [💰/🧠/⏱/🌍] [ANGLE NAME]
-Hook: "Why [positive]... but [negative reality]"
-Angle: [What the reel reveals — one sharp sentence]
-Why it works: [Why a bakery owner will feel called out]
+🔁 Pattern winning right now — [What content pattern or format is consistently outperforming across these creators? Be specific — e.g. "behind-the-scenes kitchen footage", "text-led controversy hooks", "personal storytelling carousels".]
 
-IDEA 3 — [💰/🧠/⏱/🌍] [ANGLE NAME]
-Hook: "Why [positive]... but [negative reality]"
-Angle: [What the reel reveals — one sharp sentence]
-Why it works: [Why a bakery owner will feel called out]
+🕳️ The gap — [What are NONE of these creators talking about that Flavour Founders could own? What topic or angle is missing from their content?]
 
-👀 CREATOR WATCH
-[Based on the REAL INSTAGRAM DATA above — what are the watched creators posting? What's getting engagement? Any formats or hooks worth stealing? 2-3 lines max.]
+🎬 Steal this — [One specific thing a creator did this week that worked really well. What was it, why did it work, and how could Flavour Founders adapt it?]
 
 ---
 
 RULES:
-- No generic ideas. Every reel idea must feel personal to a food business owner.
-- Hooks must follow the contradiction format — no exceptions.
+- This is RESEARCH ONLY. Do NOT generate reel ideas, hooks, or content briefs.
+- Creator intelligence must reference ACTUAL posts from the Instagram data — not guesses.
 - Keep the whole digest under 250 words.
-- No motivational fluff. Facts, tension, insight only."""
+- No motivational fluff. Facts, data, insight only."""
 
 
 def build_weekly_prompt(config: dict, instagram_data: str = "") -> str:
     competitors = config.get("_raw", "")
     week_start = datetime.now().strftime("%d %b %Y")
-    return f"""You are a high-level content strategist and research assistant for a UK food entrepreneur personal brand called Flavour Founders.
+    return f"""You are a research intelligence assistant for a UK food entrepreneur personal brand called Flavour Founders.
 
 {BRAND_CONTEXT}
 
-Competitor/watch list from config:
+Brand config:
 {competitors}
 
 {instagram_data}
 
 Week of {week_start}.
 
-Run a WEEKLY STRATEGIC DIGEST. Use web search extensively. Every insight must be actionable.
+Run a WEEKLY DEEP-DIVE research report. Use web search extensively for market intel. Use the REAL INSTAGRAM DATA above for creator analysis.
 
-Output EXACTLY in this format:
+Output EXACTLY in this format — nothing else:
 
 ---
-📋 WEEKLY STRATEGY DIGEST — w/c {week_start}
+📋 WEEKLY RESEARCH DIGEST — w/c {week_start}
 
-🏆 3 THINGS SHAPING UK FOOD BUSINESS THIS WEEK
-- [Insight 1 — one punchy line + why it matters to a food entrepreneur]
+📰 3 THINGS SHAPING UK FOOD BUSINESS THIS WEEK
+- [Insight 1 — what happened + why it matters to a food entrepreneur]
 - [Insight 2]
 - [Insight 3]
 
-🕵️ CREATOR MOVES (based on REAL Instagram data above)
-[Analyse the actual posts from watched creators. What content is getting the most engagement? What formats are working? What hooks are they using? What gaps are they missing that Flavour Founders can own?]
+🔍 CREATOR INTELLIGENCE (WEEKLY DEEP DIVE)
+Based on the real Instagram data above:
 
-📈 WHAT TO DOUBLE DOWN ON THIS WEEK
-[Based on trends — which of the 3 content angles (Money / Control / Time) has the most momentum right now and why]
+📊 What's hitting — [Across all watched creators this week — which posts got the highest engagement? What topics dominate? Include actual numbers and compare across creators.]
 
-📅 5 REEL IDEAS FOR THE WEEK
+🔁 Pattern winning right now — [What content format or approach is consistently outperforming? Has anything shifted from last week? Be specific.]
 
-IDEA 1 — [💰/🧠/⏱/🌍] [ANGLE]
-Hook: "Why [positive]... but [negative reality]"
-Angle: [Sharp one-liner]
-Why now: [What makes this week specifically the right time]
+🕳️ The gap — [What are NONE of these creators covering that Flavour Founders could own? What conversations are happening in the industry that no one is making content about?]
 
-IDEA 2 — [💰/🧠/⏱/🌍] [ANGLE]
-Hook: "Why [positive]... but [negative reality]"
-Angle: [Sharp one-liner]
-Why now: [Timing rationale]
+🎬 Steal this — [2-3 specific things creators did this week that worked. For each: what was it, why did it work, how could Flavour Founders adapt it?]
 
-IDEA 3 — [💰/🧠/⏱/🌍] [ANGLE]
-Hook: "Why [positive]... but [negative reality]"
-Angle: [Sharp one-liner]
-Why now: [Timing rationale]
-
-IDEA 4 — [💰/🧠/⏱/🌍] [ANGLE]
-Hook: "Why [positive]... but [negative reality]"
-Angle: [Sharp one-liner]
-Why now: [Timing rationale]
-
-IDEA 5 — [💰/🧠/⏱/🌍] [ANGLE]
-Hook: "Why [positive]... but [negative reality]"
-Angle: [Sharp one-liner]
-Why now: [Timing rationale]
-
-🔮 THE ONE BIG OPPORTUNITY THIS WEEK
-[Single most important strategic move for Flavour Founders right now. Specific. Actionable. No fluff.]
+📈 STRATEGIC DIRECTION
+[Based on all research above — what should Flavour Founders focus on this week and why? One clear recommendation backed by the data.]
 
 ---
 
 RULES:
-- Every reel idea must make a bakery/café owner feel called out.
-- All hooks must follow the contradiction format.
-- No generic content strategy advice — this must be specific to food entrepreneurship.
+- This is RESEARCH ONLY. Do NOT generate reel ideas, hooks, captions, or content briefs.
+- Creator intelligence must reference ACTUAL posts from the Instagram data — not guesses.
+- Every insight must be backed by data or specific observations.
 - Max 400 words total."""
 
 
