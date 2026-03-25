@@ -423,8 +423,26 @@ async def manual_trigger(digest_type: str, background_tasks: BackgroundTasks, to
         return {"error": "digest_type must be 'daily' or 'weekly'"}
 
     async def _run():
-        content = await run_research(digest_type)
-        await deliver_digest(digest_type, content)
+        try:
+            content = await run_research(digest_type)
+            await deliver_digest(digest_type, content)
+        except Exception as e:
+            log.error(f"Background task failed: {type(e).__name__}: {e}")
 
     background_tasks.add_task(_run)
     return {"status": "triggered", "digest_type": digest_type}
+
+
+@app.post("/debug/trigger/{digest_type}")
+async def debug_trigger(digest_type: str, token: str = ""):
+    """Foreground trigger — returns result or error directly."""
+    if MANUAL_TRIGGER_TOKEN and token != MANUAL_TRIGGER_TOKEN:
+        return {"error": "Unauthorised"}
+    if digest_type not in ("daily", "weekly"):
+        return {"error": "digest_type must be 'daily' or 'weekly'"}
+    try:
+        content = await run_research(digest_type)
+        await deliver_digest(digest_type, content)
+        return {"status": "success", "digest_type": digest_type, "content_length": len(content), "preview": content[:500]}
+    except Exception as e:
+        return {"status": "error", "error": f"{type(e).__name__}: {e}"}
