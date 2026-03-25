@@ -9,6 +9,7 @@ Flavour Founders Research Bot
 import os
 import json
 import logging
+import hashlib
 import httpx
 import anthropic
 
@@ -41,14 +42,29 @@ CREATOR_HANDLES = [
     "mrfourtoeight",
 ]
 
-# ── Discovery hashtags (weekly only) ─────────────────────────────────────
-DISCOVERY_HASHTAGS = [
-    "bakerybusiness",
-    "bakeryowner",
-    "cafebusiness",
-    "foodentrepreneur",
-    "coffeeshopowner",
-    "hospitalitybusiness",
+# ── Discovery pool (weekly rotation — profile scraper) ────────────────────
+# Food/bakery/hospitality creators to monitor for trends + inspiration.
+# Rotated weekly — each week scrapes a different batch of 5.
+# Add or remove names as you like — no code changes needed elsewhere.
+DISCOVERY_POOL = [
+    # Bakery / bread creators
+    "breadaheadbakery",
+    "dustybakes",
+    "theboywhobakes",
+    "fabsbakeryfoundation",
+    "breadbybike",
+    # Cafe / coffee creators
+    "departmentofcoffee",
+    "watchhousecoffee",
+    "kaffeinelondon",
+    "curators_coffee",
+    "olocobaltics",
+    # Food business / hospitality entrepreneurs
+    "loopyloaf",
+    "thebreadstation",
+    "gordonramsay",
+    "maxhalley",
+    "chefyotam",
 ]
 DISCOVERY_MIN_FOLLOWERS = 10_000
 DISCOVERY_MAX_FOLLOWERS = 500_000
@@ -214,45 +230,50 @@ def _format_deep_data(profile_data: list, post_data: list, discovery_data: list)
 
     result = "REAL INSTAGRAM DATA FROM WATCHED CREATORS (DETAILED):\n" + "\n".join(sections)
 
-    # ── Discovery section (from hashtag post scraper results) ──────────
+    # ── Discovery section (from profile scraper — rotated pool) ────────
     if discovery_data:
-        # Log first item's keys to understand data structure
-        log.info(f"Discovery returned {len(discovery_data)} items")
-        if discovery_data:
-            first = discovery_data[0]
-            log.info(f"Discovery item keys: {list(first.keys())}")
-            log.info(f"Discovery item sample: ownerUsername={first.get('ownerUsername')}, "
-                     f"owner={first.get('owner')}, username={first.get('username')}, "
-                     f"likesCount={first.get('likesCount')}, caption={str(first.get('caption',''))[:80]}")
+        log.info(f"Discovery returned {len(discovery_data)} profiles")
         existing = set(CREATOR_HANDLES)
-        # Group discovered posts by creator, pick best post per creator
-        creators_seen = {}
-        for post in discovery_data:
-            username = post.get("ownerUsername") or post.get("owner", {}).get("username") or "unknown"
+        discovered = []
+        for profile in discovery_data:
+            username = profile.get("username", "unknown")
             if username in existing:
                 continue
-            engagement = (post.get("likesCount", 0) or 0) + (post.get("commentsCount", 0) or 0)
-            if username not in creators_seen or engagement > creators_seen[username]["_engagement"]:
-                creators_seen[username] = {**post, "_engagement": engagement}
+            followers = profile.get("followersCount", 0) or 0
+            if not (DISCOVERY_MIN_FOLLOWERS <= followers <= DISCOVERY_MAX_FOLLOWERS):
+                continue
+            discovered.append(profile)
 
-        # Sort discovered creators by engagement
-        sorted_creators = sorted(creators_seen.values(), key=lambda p: p["_engagement"], reverse=True)
+        # Sort by followers
+        discovered.sort(key=lambda p: p.get("followersCount", 0) or 0, reverse=True)
 
-        if sorted_creators:
-            result += "\n\n🔎 DISCOVERED CREATORS (from hashtag search, sorted by engagement):\n"
-            for post in sorted_creators[:5]:
-                username = post.get("ownerUsername") or post.get("owner", {}).get("username") or "unknown"
-                likes = post.get("likesCount", 0) or 0
-                comments = post.get("commentsCount", 0) or 0
-                views = post.get("videoPlayCount") or post.get("videoViewCount") or 0
-                full_caption = (post.get("caption") or "").strip()
-                hook_line = full_caption.split("\n")[0][:100] if full_caption else ""
-                post_type = post.get("type", "unknown")
+        if discovered:
+            result += "\n\n🔎 DISCOVERED CREATORS (from weekly rotation pool, 10K-500K followers):\n"
+            for profile in discovered:
+                username = profile.get("username", "unknown")
+                followers = profile.get("followersCount", 0) or 0
+                bio = (profile.get("biography") or "")[:200]
+                posts = profile.get("latestPosts", [])
 
-                result += f"\n  @{username}"
-                result += f"\n  [{post_type.upper()}] {likes:,} likes | {comments:,} comments | {views:,} views"
-                result += f"\n  HOOK: \"{hook_line}\""
-                result += f"\n  CAPTION: \"{full_caption[:300]}\"\n"
+                result += f"\n  @{username} ({followers:,} followers)"
+                if bio:
+                    result += f"\n  Bio: {bio}"
+
+                # Show top posts if available
+                if posts:
+                    # Sort by engagement
+                    for p in posts:
+                        p["_eng"] = (p.get("likesCount", 0) or 0) + (p.get("commentsCount", 0) or 0)
+                    posts.sort(key=lambda p: p["_eng"], reverse=True)
+
+                    for p in posts[:3]:
+                        likes = p.get("likesCount", 0) or 0
+                        comments = p.get("commentsCount", 0) or 0
+                        post_type = p.get("type", "unknown")
+                        caption = (p.get("caption") or "").strip()
+                        hook_line = caption.split("\n")[0][:100] if caption else ""
+                        result += f"\n    [{post_type.upper()}] {likes:,} likes | {comments:,} comments — \"{hook_line}\""
+                result += "\n"
 
     return result
 
@@ -291,10 +312,16 @@ async def scrape_instagram_creators(digest_type: str = "daily") -> str:
                     {"username": CREATOR_HANDLES, "resultsLimit": 5},
                     "WeeklyPosts",
                 )
-                # Discovery: search for creators via hashtag keywords
+                # Discovery: rotate through pool — 5 creators per week
+                week_num = int(datetime.now().strftime("%U"))  # week of year
+                batch_size = 5
+                start = (week_num * batch_size) % len(DISCOVERY_POOL)
+                discovery_batch = (DISCOVERY_POOL + DISCOVERY_POOL)[start:start + batch_size]
+                log.info(f"Discovery batch (week {week_num}): {discovery_batch}")
+
                 discovery_task = _run_apify_actor(
-                    http, "apify~instagram-search-scraper",
-                    {"search": DISCOVERY_HASHTAGS, "resultsLimit": 10, "searchType": "hashtag"},
+                    http, "apify~instagram-profile-scraper",
+                    {"usernames": discovery_batch, "resultsLimit": 10},
                     "Discovery",
                 )
 
@@ -564,36 +591,32 @@ async def debug_scrape(token: str = "", mode: str = "daily"):
 
 
 @app.get("/debug/discovery")
-async def debug_discovery(token: str = "", variant: int = 1):
-    """Test discovery scraper with different input formats. variant=1,2,3"""
+async def debug_discovery(token: str = ""):
+    """Test discovery pool scraper."""
     import asyncio
     if MANUAL_TRIGGER_TOKEN and token != MANUAL_TRIGGER_TOKEN:
         return {"error": "Unauthorised"}
 
-    variants = {
-        1: {"search": DISCOVERY_HASHTAGS, "resultsLimit": 5, "searchType": "hashtag"},
-        2: {"search": "bakerybusiness", "resultsLimit": 5, "searchType": "hashtag"},
-        3: {"queries": ["bakerybusiness", "bakeryowner"], "resultsLimit": 5, "searchType": "hashtag"},
-        4: {"search": ["bakerybusiness"], "resultsLimit": 5, "type": "hashtag"},
-        5: {"hashtags": ["bakerybusiness"], "resultsLimit": 5},
-    }
-    input_json = variants.get(variant, variants[1])
+    week_num = int(datetime.now().strftime("%U"))
+    batch_size = 5
+    start = (week_num * batch_size) % len(DISCOVERY_POOL)
+    batch = (DISCOVERY_POOL + DISCOVERY_POOL)[start:start + batch_size]
 
     async with httpx.AsyncClient(timeout=600) as http:
         data = await _run_apify_actor(
-            http, "apify~instagram-search-scraper",
-            input_json,
-            f"DebugDiscovery_v{variant}",
+            http, "apify~instagram-profile-scraper",
+            {"usernames": batch, "resultsLimit": 10},
+            "DebugDiscovery",
         )
     if not data:
-        return {"status": "no data", "items": 0, "variant": variant, "input": input_json}
-    first = data[0]
+        return {"status": "no data", "items": 0, "batch": batch}
     return {
         "items": len(data),
-        "variant": variant,
-        "input": input_json,
-        "first_item_keys": list(first.keys()),
-        "first_item_sample": {k: str(v)[:200] for k, v in list(first.items())[:15]},
+        "batch": batch,
+        "profiles": [
+            {"username": p.get("username"), "followers": p.get("followersCount"), "bio": (p.get("biography") or "")[:100]}
+            for p in data
+        ],
     }
 
 
