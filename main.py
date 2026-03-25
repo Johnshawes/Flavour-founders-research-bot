@@ -41,6 +41,18 @@ CREATOR_HANDLES = [
     "mrfourtoeight",
 ]
 
+# ── Discovery hashtags (weekly only) ─────────────────────────────────────
+DISCOVERY_HASHTAGS = [
+    "bakerybusiness",
+    "bakeryowner",
+    "cafebusiness",
+    "foodentrepreneur",
+    "coffeeshopowner",
+    "hospitalitybusiness",
+]
+DISCOVERY_MIN_FOLLOWERS = 10_000
+DISCOVERY_MAX_FOLLOWERS = 500_000
+
 # ── Load CLAUDE.md config ──────────────────────────────────────────────────
 def load_config() -> dict:
     """Read CLAUDE.md and parse config sections."""
@@ -64,102 +76,225 @@ def load_config() -> dict:
 client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
 
-# ── Apify Instagram scraper ──────────────────────────────────────────────
-async def scrape_instagram_creators() -> str:
-    """Use Apify to scrape recent posts from watched creators."""
+# ── Apify helper: run actor, poll, return results ────────────────────────
+async def _run_apify_actor(http, actor_id: str, input_json: dict, label: str) -> list:
+    """Start an Apify actor, poll until done, return dataset items."""
+    import asyncio
+
+    start_resp = await http.post(
+        f"https://api.apify.com/v2/acts/{actor_id}/runs",
+        params={"token": APIFY_API_TOKEN},
+        json=input_json,
+    )
+    log.info(f"[{label}] start: {start_resp.status_code}")
+
+    if start_resp.status_code not in (200, 201):
+        log.error(f"[{label}] start failed: {start_resp.status_code} - {start_resp.text[:500]}")
+        return []
+
+    run_data = start_resp.json().get("data", {})
+    run_id = run_data.get("id")
+    dataset_id = run_data.get("defaultDatasetId")
+    log.info(f"[{label}] run_id={run_id}, dataset_id={dataset_id}")
+
+    if not run_id:
+        return []
+
+    for attempt in range(48):
+        await asyncio.sleep(10)
+        status_resp = await http.get(
+            f"https://api.apify.com/v2/actor-runs/{run_id}",
+            params={"token": APIFY_API_TOKEN},
+        )
+        run_status = status_resp.json().get("data", {}).get("status")
+        log.info(f"[{label}] status (attempt {attempt+1}): {run_status}")
+        if run_status == "SUCCEEDED":
+            break
+        elif run_status in ("FAILED", "ABORTED", "TIMED-OUT"):
+            log.error(f"[{label}] failed: {run_status}")
+            return []
+    else:
+        log.error(f"[{label}] timed out")
+        return []
+
+    dataset_resp = await http.get(
+        f"https://api.apify.com/v2/datasets/{dataset_id}/items",
+        params={"token": APIFY_API_TOKEN},
+    )
+    if dataset_resp.status_code != 200:
+        log.error(f"[{label}] dataset fetch failed: {dataset_resp.status_code}")
+        return []
+
+    data = dataset_resp.json()
+    log.info(f"[{label}] returned {len(data)} items")
+    return data
+
+
+# ── Format profile-only data (daily) ─────────────────────────────────────
+def _format_profile_data(profile_data: list) -> str:
+    """Light format — profile scraper data only (used for daily digest)."""
+    sections = []
+    for profile in profile_data:
+        username = profile.get("username", "unknown")
+        followers = profile.get("followersCount", "?")
+        posts = profile.get("latestPosts", [])
+
+        section = f"\n@{username} ({followers} followers) — recent posts:"
+        for post in posts[:5]:
+            caption = (post.get("caption") or "")[:150]
+            likes = post.get("likesCount", 0)
+            comments = post.get("commentsCount", 0)
+            post_type = post.get("type", "unknown")
+            section += f"\n  - [{post_type}] {likes} likes, {comments} comments: \"{caption}\""
+        sections.append(section)
+
+    if not sections:
+        return "No Instagram profile data available."
+    return "REAL INSTAGRAM DATA FROM WATCHED CREATORS:\n" + "\n".join(sections)
+
+
+# ── Format deep post data (weekly) ───────────────────────────────────────
+def _format_deep_data(profile_data: list, post_data: list, discovery_data: list) -> str:
+    """Rich format — profiles + detailed posts + discovered creators (weekly)."""
+
+    # Build profile lookup
+    profile_map = {}
+    for profile in profile_data:
+        username = profile.get("username", "unknown")
+        profile_map[username] = {
+            "followers": profile.get("followersCount", "?"),
+            "bio": (profile.get("biography") or "")[:200],
+        }
+
+    # Group posts by creator
+    posts_by_creator = {}
+    for post in post_data:
+        owner = post.get("ownerUsername") or post.get("owner", {}).get("username", "unknown")
+        posts_by_creator.setdefault(owner, []).append(post)
+
+    # ── Core creators section ────────────────────────────────────────────
+    sections = []
+    for handle in CREATOR_HANDLES:
+        info = profile_map.get(handle, {})
+        followers = info.get("followers", "?")
+        bio = info.get("bio", "")
+
+        section = f"\n@{handle} ({followers} followers)"
+        if bio:
+            section += f"\nBio: {bio}"
+
+        creator_posts = posts_by_creator.get(handle, [])
+        if not creator_posts:
+            section += "\n  No detailed post data."
+            sections.append(section)
+            continue
+
+        # Sort by engagement
+        for p in creator_posts:
+            p["_engagement"] = (p.get("likesCount", 0) or 0) + (p.get("commentsCount", 0) or 0)
+        creator_posts.sort(key=lambda p: p["_engagement"], reverse=True)
+
+        section += f"\n  Posts ({len(creator_posts)} scraped, sorted by engagement):"
+        for p in creator_posts[:5]:
+            post_type = p.get("type", "unknown")
+            likes = p.get("likesCount", 0) or 0
+            comments = p.get("commentsCount", 0) or 0
+            views = p.get("videoPlayCount") or p.get("videoViewCount") or p.get("playCount") or 0
+            url = p.get("url") or ""
+            full_caption = (p.get("caption") or "").strip()
+            hook_line = full_caption.split("\n")[0][:100] if full_caption else ""
+
+            section += f"\n\n  [{post_type.upper()}] {likes:,} likes | {comments:,} comments | {views:,} views"
+            if url:
+                section += f"\n  URL: {url}"
+            section += f"\n  HOOK: \"{hook_line}\""
+            section += f"\n  FULL CAPTION: \"{full_caption[:500]}\""
+
+        sections.append(section)
+
+    result = "REAL INSTAGRAM DATA FROM WATCHED CREATORS (DETAILED):\n" + "\n".join(sections)
+
+    # ── Discovery section ────────────────────────────────────────────────
+    if discovery_data:
+        # Filter by follower range and exclude existing watchlist
+        existing = set(CREATOR_HANDLES)
+        discovered = []
+        for profile in discovery_data:
+            username = profile.get("username") or profile.get("ownerUsername") or "unknown"
+            if username in existing:
+                continue
+            followers = profile.get("followersCount") or profile.get("likesCount") or 0
+            if not (DISCOVERY_MIN_FOLLOWERS <= followers <= DISCOVERY_MAX_FOLLOWERS):
+                continue
+            discovered.append(profile)
+            existing.add(username)  # deduplicate
+
+        if discovered:
+            result += "\n\n🔎 DISCOVERED CREATORS (new accounts from hashtag search, 10K-500K followers):\n"
+            for profile in discovered[:5]:
+                username = profile.get("username") or profile.get("ownerUsername") or "unknown"
+                followers = profile.get("followersCount", "?")
+                bio = (profile.get("biography") or "")[:150]
+                caption = (profile.get("caption") or "")[:150]
+                result += f"\n  @{username} ({followers:,} followers)"
+                if bio:
+                    result += f" — {bio}"
+                elif caption:
+                    result += f" — Recent: \"{caption}\""
+
+    return result
+
+
+# ── Main scraper entry point ─────────────────────────────────────────────
+async def scrape_instagram_creators(digest_type: str = "daily") -> str:
+    """Scrape Instagram data. Daily = profile only. Weekly = profile + posts + discovery."""
     if not APIFY_API_TOKEN:
         log.warning("No APIFY_API_TOKEN set — skipping Instagram scrape")
         return "No Instagram data available (Apify not configured)."
 
     import asyncio
-    log.info(f"Apify token present: {bool(APIFY_API_TOKEN)} (length: {len(APIFY_API_TOKEN)})")
-    all_posts = []
+    log.info(f"Scraping creators for {digest_type} digest...")
 
-    try:
-        log.info(f"Scraping {len(CREATOR_HANDLES)} Instagram creators via Apify...")
-        async with httpx.AsyncClient(timeout=600) as http:
-
-            # Step 1: Start the run
-            start_resp = await http.post(
-                "https://api.apify.com/v2/acts/apify~instagram-profile-scraper/runs",
-                params={"token": APIFY_API_TOKEN},
-                json={
-                    "usernames": CREATOR_HANDLES,
-                    "resultsLimit": 5,
-                },
-            )
-            log.info(f"Apify start response: {start_resp.status_code}")
-
-            if start_resp.status_code not in (200, 201):
-                log.error(f"Apify start failed: {start_resp.status_code} - {start_resp.text[:500]}")
-                return f"Instagram scrape failed to start (HTTP {start_resp.status_code})."
-
-            run_data = start_resp.json().get("data", {})
-            run_id = run_data.get("id")
-            dataset_id = run_data.get("defaultDatasetId")
-            log.info(f"Apify run started: run_id={run_id}, dataset_id={dataset_id}")
-
-            if not run_id:
-                return "Instagram scrape failed: no run ID returned."
-
-            # Step 2: Poll until the run finishes (max 5 minutes)
-            for attempt in range(30):
-                await asyncio.sleep(10)
-                status_resp = await http.get(
-                    f"https://api.apify.com/v2/actor-runs/{run_id}",
-                    params={"token": APIFY_API_TOKEN},
+    async with httpx.AsyncClient(timeout=600) as http:
+        try:
+            if digest_type == "daily":
+                # Daily: profile scraper only (cheap)
+                profile_data = await _run_apify_actor(
+                    http, "apify~instagram-profile-scraper",
+                    {"usernames": CREATOR_HANDLES, "resultsLimit": 5},
+                    "DailyProfiles",
                 )
-                run_status = status_resp.json().get("data", {}).get("status")
-                log.info(f"Apify run status (attempt {attempt+1}): {run_status}")
+                return _format_profile_data(profile_data)
 
-                if run_status == "SUCCEEDED":
-                    break
-                elif run_status in ("FAILED", "ABORTED", "TIMED-OUT"):
-                    return f"Instagram scrape failed: run status {run_status}."
             else:
-                return "Instagram scrape timed out waiting for Apify."
+                # Weekly: profile + post + discovery scrapers in parallel
+                creator_urls = [f"https://www.instagram.com/{h}/" for h in CREATOR_HANDLES]
+                hashtag_urls = [f"https://www.instagram.com/explore/tags/{tag}/" for tag in DISCOVERY_HASHTAGS]
 
-            # Step 3: Fetch the dataset
-            dataset_resp = await http.get(
-                f"https://api.apify.com/v2/datasets/{dataset_id}/items",
-                params={"token": APIFY_API_TOKEN},
-            )
-            log.info(f"Apify dataset response: {dataset_resp.status_code}")
+                profile_task = _run_apify_actor(
+                    http, "apify~instagram-profile-scraper",
+                    {"usernames": CREATOR_HANDLES, "resultsLimit": 10},
+                    "WeeklyProfiles",
+                )
+                post_task = _run_apify_actor(
+                    http, "apify~instagram-post-scraper",
+                    {"directUrls": creator_urls, "resultsLimit": 5, "resultsType": "posts"},
+                    "WeeklyPosts",
+                )
+                discovery_task = _run_apify_actor(
+                    http, "apify~instagram-hashtag-scraper",
+                    {"hashtags": DISCOVERY_HASHTAGS, "resultsLimit": 10},
+                    "Discovery",
+                )
 
-            if dataset_resp.status_code != 200:
-                return f"Instagram scrape failed to fetch results (HTTP {dataset_resp.status_code})."
+                profile_data, post_data, discovery_data = await asyncio.gather(
+                    profile_task, post_task, discovery_task
+                )
+                return _format_deep_data(profile_data, post_data, discovery_data)
 
-            data = dataset_resp.json()
-            log.info(f"Apify returned {len(data)} profiles")
-
-            if not data:
-                return "Instagram scrape returned no data."
-
-            for profile in data:
-                username = profile.get("username", "unknown")
-                followers = profile.get("followersCount", "?")
-                posts = profile.get("latestPosts", [])
-
-                creator_summary = f"\n@{username} ({followers} followers) — recent posts:"
-                for post in posts[:5]:
-                    caption = (post.get("caption") or "")[:150]
-                    likes = post.get("likesCount", 0)
-                    comments = post.get("commentsCount", 0)
-                    post_type = post.get("type", "unknown")
-                    creator_summary += f"\n  - [{post_type}] {likes} likes, {comments} comments: \"{caption}\""
-
-                all_posts.append(creator_summary)
-
-    except Exception as e:
-        log.error(f"Apify scrape failed: {type(e).__name__}: {e}")
-        return f"Instagram scrape failed: {type(e).__name__}: {e}"
-
-    if not all_posts:
-        return "Instagram scrape returned no data."
-
-    result = "REAL INSTAGRAM DATA FROM WATCHED CREATORS:\n" + "\n".join(all_posts)
-    log.info(f"Instagram scrape complete: {len(all_posts)} creators scraped")
-    return result
+        except Exception as e:
+            log.error(f"Apify scrape failed: {type(e).__name__}: {e}")
+            return f"Instagram scrape failed: {type(e).__name__}: {e}"
 
 # ── Research prompts ───────────────────────────────────────────────────────
 BRAND_CONTEXT = """
@@ -286,6 +421,10 @@ Based on the real Instagram data above:
 
 🎬 Steal this — [2-3 specific things creators did this week that worked. For each: what was it, why did it work, how could Flavour Founders adapt it?]
 
+🔎 NEW CREATORS SPOTTED
+The Instagram data above includes discovered creators from hashtag searches (10K-500K followers).
+[For each discovered creator worth watching: who they are, what they post, why they're relevant to Flavour Founders, and whether they should be added to the permanent watchlist. Max 3 creators.]
+
 📈 STRATEGIC DIRECTION
 [Based on all research above — what should Flavour Founders focus on this week and why? One clear recommendation backed by the data.]
 
@@ -293,10 +432,10 @@ Based on the real Instagram data above:
 
 RULES:
 - This is RESEARCH ONLY. Do NOT generate reel ideas, hooks, captions, or content briefs.
-- Creator intelligence must reference ACTUAL posts from the Instagram data — not guesses.
+- Creator intelligence must reference ACTUAL posts from the Instagram data — not guesses. Use view counts, hook text, and full captions to analyse what's working.
 - Every insight must be backed by data or specific observations.
 - NEVER cite news older than 7 days. If nothing recent exists, say so.
-- Max 400 words total."""
+- Max 500 words total."""
 
 
 # ── Core research runner ───────────────────────────────────────────────────
@@ -304,8 +443,8 @@ async def run_research(digest_type: str) -> str:
     """Call Claude with web search to generate a research digest."""
     config = load_config()
 
-    # Scrape real Instagram data before building the prompt
-    instagram_data = await scrape_instagram_creators()
+    # Scrape real Instagram data — daily = profiles only, weekly = profiles + posts + discovery
+    instagram_data = await scrape_instagram_creators(digest_type)
 
     prompt = (
         build_daily_prompt(config, instagram_data)
@@ -405,12 +544,12 @@ async def health():
 
 
 @app.get("/debug/scrape")
-async def debug_scrape(token: str = ""):
-    """Test the Apify scraper independently."""
+async def debug_scrape(token: str = "", mode: str = "daily"):
+    """Test the Apify scraper independently. mode = 'daily' or 'weekly'."""
     if MANUAL_TRIGGER_TOKEN and token != MANUAL_TRIGGER_TOKEN:
         return {"error": "Unauthorised"}
-    result = await scrape_instagram_creators()
-    return {"apify_token_set": bool(APIFY_API_TOKEN), "result_length": len(result), "preview": result[:1000]}
+    result = await scrape_instagram_creators(mode)
+    return {"apify_token_set": bool(APIFY_API_TOKEN), "mode": mode, "result_length": len(result), "preview": result[:2000]}
 
 
 @app.post("/trigger/{digest_type}")
