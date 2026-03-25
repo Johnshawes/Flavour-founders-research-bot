@@ -178,13 +178,39 @@ def _format_own_reels(post_data: list) -> str:
     if not post_data:
         return "YOUR RECENT REELS:\n  No reel data available."
 
-    # Sort by engagement
-    for p in post_data:
-        p["_engagement"] = (p.get("likesCount", 0) or 0) + (p.get("commentsCount", 0) or 0)
-    post_data.sort(key=lambda p: p["_engagement"], reverse=True)
+    from datetime import datetime, timedelta, timezone
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=48)
 
-    result = "YOUR RECENT REELS (@john_s_hawes) — sorted by engagement:\n"
-    for p in post_data[:5]:
+    # Filter: only posts from last 48 hours, exclude pinned
+    recent = []
+    for p in post_data:
+        # Skip pinned posts
+        if p.get("isPinned") or p.get("pinned"):
+            continue
+        # Check timestamp
+        ts = p.get("timestamp") or p.get("takenAtTimestamp") or ""
+        if ts:
+            try:
+                if isinstance(ts, (int, float)):
+                    post_time = datetime.fromtimestamp(ts, tz=timezone.utc)
+                else:
+                    post_time = datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+                if post_time < cutoff:
+                    continue
+            except (ValueError, TypeError):
+                pass  # Include if we can't parse the timestamp
+        recent.append(p)
+
+    if not recent:
+        return "YOUR RECENT REELS:\n  No reels found from the last 48 hours (pinned posts excluded)."
+
+    # Sort by engagement
+    for p in recent:
+        p["_engagement"] = (p.get("likesCount", 0) or 0) + (p.get("commentsCount", 0) or 0)
+    recent.sort(key=lambda p: p["_engagement"], reverse=True)
+
+    result = "YOUR RECENT REELS (@john_s_hawes) — last 48hrs, pinned excluded, sorted by engagement:\n"
+    for p in recent[:5]:
         post_type = p.get("type", "unknown")
         likes = p.get("likesCount", 0) or 0
         comments = p.get("commentsCount", 0) or 0
