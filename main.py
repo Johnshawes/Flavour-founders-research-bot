@@ -33,6 +33,20 @@ MANUAL_TRIGGER_TOKEN = os.environ.get("MANUAL_TRIGGER_TOKEN", "")  # optional au
 APIFY_API_TOKEN = os.environ.get("APIFY_API_TOKEN", "")  # for Instagram scraping
 RESEARCH_WEBHOOK_URL = os.environ.get("RESEARCH_WEBHOOK_URL", "")  # content bot ingest
 
+# ── Ideas store (received from Slack #idea channel via workflow webhook) ──
+ideas_store: list[dict] = []  # {"text": "...", "received_at": "..."}
+
+
+def drain_ideas() -> str:
+    """Pop all pending ideas and return as formatted string. Clears the store."""
+    if not ideas_store:
+        return ""
+    lines = []
+    for i, idea in enumerate(ideas_store, 1):
+        lines.append(f"{i}. {idea['text']}  (submitted {idea['received_at'][:16]})")
+    ideas_store.clear()
+    return "\n".join(lines)
+
 # ── Your handle (for daily reel review) ───────────────────────────────────
 OWN_HANDLE = "john_s_hawes"
 
@@ -429,9 +443,22 @@ Focus on ENTREPRENEURSHIP in food & drink — not macro industry reports, alt-pr
 """
 
 
-def build_daily_prompt(config: dict, instagram_data: str = "") -> str:
+def build_daily_prompt(config: dict, instagram_data: str = "", ideas: str = "") -> str:
     competitors = config.get("_raw", "")
     today = datetime.now().strftime("%A %d %B %Y")
+
+    ideas_block = ""
+    if ideas.strip():
+        ideas_block = f"""
+JOHN'S IDEAS (dropped into #idea channel in the last 24 hours):
+{ideas}
+
+IMPORTANT: These are raw content ideas from John himself. They should be treated as HIGH PRIORITY.
+- Research and validate each idea — find supporting data, trends, or angles that make it stronger.
+- Include relevant creator intelligence or news that connects to these ideas.
+- If an idea is strong, say so and explain why. If it needs sharpening, suggest how.
+"""
+
     return f"""You are a research intelligence assistant for a UK food entrepreneur personal brand called Flavour Founders.
 
 {BRAND_CONTEXT}
@@ -440,6 +467,8 @@ Brand config:
 {competitors}
 
 {instagram_data}
+
+{ideas_block}
 
 Today is {today}.
 
@@ -469,6 +498,14 @@ Based on the real Instagram data above, analyse what the watched creators are do
 🕳️ The gap — [What are NONE of these creators talking about that Flavour Founders could own? What topic or angle is missing from their content?]
 
 🎬 Steal this — [One specific thing a creator did this week that worked really well. What was it, why did it work, and how could Flavour Founders adapt it?]
+
+💡 JOHN'S IDEAS — VALIDATED
+[If John dropped ideas in the #idea channel, validate each one here. For each idea:
+- The idea (as John wrote it)
+- Supporting data or trend that backs it up
+- Suggested angle or sharpening to make it hit harder
+- Verdict: 🟢 Strong / 🟡 Needs work / 🔴 Skip
+If no ideas were submitted, omit this section entirely.]
 
 ---
 
@@ -552,8 +589,13 @@ async def run_research(digest_type: str) -> str:
     # Scrape real Instagram data — daily = profiles only, weekly = profiles + posts + discovery
     instagram_data = await scrape_instagram_creators(digest_type)
 
+    # Drain pending ideas for daily digest
+    ideas = drain_ideas() if digest_type == "daily" else ""
+    if ideas:
+        log.info(f"Including {ideas.count(chr(10)) + 1} ideas from #idea channel")
+
     prompt = (
-        build_daily_prompt(config, instagram_data)
+        build_daily_prompt(config, instagram_data, ideas)
         if digest_type == "daily"
         else build_weekly_prompt(config, instagram_data)
     )
@@ -737,7 +779,35 @@ async def health():
         {"id": job.id, "next_run": str(job.next_run_time)}
         for job in scheduler.get_jobs()
     ]
-    return {"status": "running", "bot": "Flavour Founders Research Bot", "scheduled_jobs": jobs}
+    return {
+        "status": "running",
+        "bot": "Flavour Founders Research Bot",
+        "scheduled_jobs": jobs,
+        "pending_ideas": len(ideas_store),
+    }
+
+
+@app.post("/ideas")
+async def receive_idea(payload: dict):
+    """Receive a content idea from Slack Workflow webhook."""
+    text = payload.get("text", "").strip()
+    if not text:
+        return {"error": "No text provided"}
+
+    ideas_store.append({
+        "text": text,
+        "received_at": datetime.now().isoformat(),
+    })
+    log.info(f"Idea received: {text[:80]}... ({len(ideas_store)} pending)")
+    return {"status": "stored", "pending_ideas": len(ideas_store)}
+
+
+@app.get("/ideas")
+async def list_ideas(token: str = ""):
+    """View pending ideas (debug)."""
+    if MANUAL_TRIGGER_TOKEN and token != MANUAL_TRIGGER_TOKEN:
+        return {"error": "Unauthorised"}
+    return {"pending_ideas": len(ideas_store), "ideas": ideas_store}
 
 
 @app.get("/debug/scrape")
