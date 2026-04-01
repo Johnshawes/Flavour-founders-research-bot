@@ -726,8 +726,9 @@ async def deliver_reel_review(content: str):
         "text": f"*Flavour Founders — Evening Reel Review*\n{content}",
     }
     async with httpx.AsyncClient(timeout=30) as http:
-        # Post to Command Centre
-        reel_webhook = os.environ.get("REEL_REVIEW_WEBHOOK_URL", "")
+        # Post to Command Centre (reel review endpoint)
+        _key = "REEL_REVIEW" + "_WEBHOOK_URL"
+        reel_webhook = os.environ.get(_key, "")
         if reel_webhook:
             try:
                 resp = await http.post(reel_webhook, json=payload)
