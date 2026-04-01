@@ -32,7 +32,6 @@ OUTPUT_WEBHOOK_URL = os.environ["OUTPUT_WEBHOOK_URL"]   # Slack / Notion / email
 MANUAL_TRIGGER_TOKEN = os.environ.get("MANUAL_TRIGGER_TOKEN", "")  # optional auth
 APIFY_API_TOKEN = os.environ.get("APIFY_API_TOKEN", "")  # for Instagram scraping
 RESEARCH_WEBHOOK_URL = os.environ.get("RESEARCH_WEBHOOK_URL", "")  # content bot ingest
-REEL_REVIEW_WEBHOOK_URL = os.environ.get("REEL_REVIEW_WEBHOOK_URL", "")  # command centre reel review
 
 # ── Ideas store (received from Slack #idea channel via workflow webhook) ──
 ideas_store: list[dict] = []  # {"text": "...", "received_at": "..."}
@@ -728,9 +727,10 @@ async def deliver_reel_review(content: str):
     }
     async with httpx.AsyncClient(timeout=30) as http:
         # Post to Command Centre
-        if REEL_REVIEW_WEBHOOK_URL:
+        reel_webhook = os.environ.get("REEL_REVIEW_WEBHOOK_URL", "")
+        if reel_webhook:
             try:
-                resp = await http.post(REEL_REVIEW_WEBHOOK_URL, json=payload)
+                resp = await http.post(reel_webhook, json=payload)
                 resp.raise_for_status()
                 log.info(f"Reel review delivered to Command Centre → {resp.status_code}")
             except Exception as e:
