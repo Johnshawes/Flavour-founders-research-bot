@@ -719,31 +719,20 @@ async def run_reel_review() -> str:
 
 
 async def deliver_reel_review(content: str):
-    """POST reel review to Command Centre (and Slack as fallback)."""
+    """POST reel review to Command Centre via OUTPUT_WEBHOOK_URL."""
     payload = {
+        "digest_type": "reel_review",
         "content": content,
         "generated_at": datetime.now().isoformat(),
         "text": f"*Flavour Founders — Evening Reel Review*\n{content}",
     }
     async with httpx.AsyncClient(timeout=30) as http:
-        # Post to Command Centre (reel review endpoint)
-        _key = "REEL_REVIEW" + "_WEBHOOK_URL"
-        reel_webhook = os.environ.get(_key, "")
-        if reel_webhook:
-            try:
-                resp = await http.post(reel_webhook, json=payload)
-                resp.raise_for_status()
-                log.info(f"Reel review delivered to Command Centre → {resp.status_code}")
-            except Exception as e:
-                log.error(f"Command Centre reel review delivery failed: {e}")
-
-        # Also post to main webhook (Slack/Command Centre)
         try:
             resp = await http.post(OUTPUT_WEBHOOK_URL, json=payload)
             resp.raise_for_status()
-            log.info(f"Reel review delivered to output webhook → {resp.status_code}")
+            log.info(f"Reel review delivered → {resp.status_code}")
         except Exception as e:
-            log.error(f"Output webhook reel review delivery failed: {e}")
+            log.error(f"Reel review delivery failed: {e}")
 
 
 # ── Scheduled jobs ─────────────────────────────────────────────────────────
