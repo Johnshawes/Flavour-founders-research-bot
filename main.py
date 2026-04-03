@@ -33,17 +33,40 @@ MANUAL_TRIGGER_TOKEN = os.environ.get("MANUAL_TRIGGER_TOKEN", "")  # optional au
 APIFY_API_TOKEN = os.environ.get("APIFY_API_TOKEN", "")  # for Instagram scraping
 RESEARCH_WEBHOOK_URL = os.environ.get("RESEARCH_WEBHOOK_URL", "")  # content bot ingest
 
-# ── Ideas store (received from Slack #idea channel via workflow webhook) ──
+# ── Ideas store (in-memory fallback + Command Centre pull) ──
 ideas_store: list[dict] = []  # {"text": "...", "received_at": "..."}
 
+COMMAND_CENTRE_URL = os.environ.get("COMMAND_CENTRE_URL", "").rstrip("/")
+INGEST_TOKEN = os.environ.get("INGEST_TOKEN", "")
 
-def drain_ideas() -> str:
-    """Pop all pending ideas and return as formatted string. Clears the store."""
-    if not ideas_store:
-        return ""
+
+async def drain_ideas() -> str:
+    """Pull pending ideas from Command Centre, fall back to local store."""
     lines = []
-    for i, idea in enumerate(ideas_store, 1):
-        lines.append(f"{i}. {idea['text']}  (submitted {idea['received_at'][:16]})")
+
+    # Pull from Command Centre (source of truth)
+    if COMMAND_CENTRE_URL:
+        try:
+            async with httpx.AsyncClient(timeout=10) as http:
+                resp = await http.get(f"{COMMAND_CENTRE_URL}/api/ideas")
+                if resp.status_code == 200:
+                    data = resp.json()
+                    ideas = data.get("ideas", [])
+                    pending = [i for i in ideas if i.get("status") == "pending"]
+                    for idx, idea in enumerate(pending, 1):
+                        text = idea.get("text", "")
+                        created = idea.get("created_at", "")[:16]
+                        lines.append(f"{idx}. {text}  (submitted {created})")
+                    if pending:
+                        log.info(f"Pulled {len(pending)} pending ideas from Command Centre")
+        except Exception as e:
+            log.warning(f"Failed to pull ideas from Command Centre: {e}")
+
+    # Fallback: use local in-memory store
+    if not lines and ideas_store:
+        for i, idea in enumerate(ideas_store, 1):
+            lines.append(f"{i}. {idea['text']}  (submitted {idea['received_at'][:16]})")
+
     ideas_store.clear()
     return "\n".join(lines)
 
@@ -590,7 +613,7 @@ async def run_research(digest_type: str) -> str:
     instagram_data = await scrape_instagram_creators(digest_type)
 
     # Drain pending ideas for daily digest
-    ideas = drain_ideas() if digest_type == "daily" else ""
+    ideas = (await drain_ideas()) if digest_type == "daily" else ""
     if ideas:
         log.info(f"Including {ideas.count(chr(10)) + 1} ideas from #idea channel")
 
