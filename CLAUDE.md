@@ -60,7 +60,7 @@ Not a coach. Not a motivational speaker. A real operator sharing real lessons.
 ## Monetisation
 
 Single high-ticket offer:
-- **Flavour Founders 180-Day Bakery Transformation Programme — £5,000**
+- **Flavour Founders 180-Day Bakery Transformation Programme — £5K + VAT**
 - Takes bakery/cafe owners from unprofitable and owner-dependent to systemised, profitable, scalable
 - Target: 10-15% net profit margin
 - Phases: Onboarding → Profit Reset → Dream Team Builder → Automation & Freedom
